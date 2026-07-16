@@ -1,0 +1,115 @@
+/* style/custom.css */
+
+/* --- 1. PEŁNE TŁO WIDOKU (WINNICA) NA EKRANIE LOGOWANIA --- */
+html:has(input[type="password"]) [data-testid="stAppViewContainer"] {
+    background-image: linear-gradient(rgba(0, 0, 0, 0.25), rgba(0, 0, 0, 0.35)), 
+                     url('https://i.wpimg.pl/c/640x480/filerepo.grupawp.pl/api/v1/display/embed/9526bce4-5cc4-4f5f-9925-1813884ed79c') !important;
+    background-size: cover !important;
+    background-position: center center !important;
+    background-repeat: no-repeat !important;
+    background-attachment: fixed !important;
+}
+
+/* Tło dla zalogowanego użytkownika (Ciepły piasek / beż) */
+[data-testid="stAppViewContainer"] {
+    background-color: #F4F1EA !important;
+}
+
+/* --- 2. EKRAN LOGOWANIA (PRZEZROCZYSTA SZKLANA KARTA) --- */
+div[data-testid="stForm"]:has(input[type="password"]) {
+    background: rgba(255, 255, 255, 0.35) !important; /* Obniżona nieprzezroczystość dla efektu szkła */
+    backdrop-filter: blur(16px) !important;
+    -webkit-backdrop-filter: blur(16px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.4) !important;
+    border-radius: 20px !important;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3) !important;
+    padding: 30px !important;
+    max-width: 420px !important;
+    margin: 80px auto 0 auto !important;
+}
+
+/* Nowoczesny, jasny i czytelny tytuł nad formularzem */
+.login-header-title {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+    font-weight: 800 !important;
+    color: #FFFFFF !important;
+    font-size: 36px !important;
+    text-align: center;
+    letter-spacing: -0.5px;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+    margin-bottom: 30px !important; /* Dystans bezpośrednio do pól formularza */
+}
+
+/* --- 3. FIX DLA BRZYDKIEGO PRZYCISKU POKAŻ HASŁO --- */
+/* Usuwamy czarne tło i dopasowujemy kontener przycisku oka do inputu */
+div[data-testid="stTextInput"] div[role="button"] {
+    background-color: transparent !important;
+    background: transparent !important;
+    border: none !important;
+    color: #8B0000 !important; /* Burgundowe oko */
+}
+
+/* --- 4. PEŁNY KONTRAST ETYKIET I INPUTÓW --- */
+label, [data-testid="stWidgetLabel"] p, .stWidgetLabel {
+    color: #111111 !important; 
+    font-weight: 700 !important;
+    font-size: 14px !important;
+    text-shadow: none !important;
+}
+
+input, select, textarea, [data-baseweb="select"], [data-baseweb="input"] {
+    background-color: #FFFFFF !important;
+    color: #111111 !important;
+    border: 1px solid #C5BCB0 !important;
+    border-radius: 10px !important;
+}
+
+/* Usunięcie brzydkich klocków z widgetu liczbowego */
+[data-testid="stNumberInput"] button {
+    background-color: #F4F1EA !important;
+    color: #111111 !important;
+    border: 1px solid #C5BCB0 !important;
+}
+
+/* --- 5. PRZYCISKI (BURGUND EGERSKI) --- */
+button, [data-testid="baseButton-secondary"], [data-testid="baseButton-primary"] {
+    background-color: #8B0000 !important; 
+    color: #FFFFFF !important;
+    border-radius: 10px !important;
+    border: 1px solid #8B0000 !important;
+    font-weight: 700 !important;
+    padding: 10px 20px !important;
+    box-shadow: 0 4px 8px rgba(139, 0, 0, 0.2) !important;
+}
+
+button:hover {
+    background-color: #A30000 !important;
+    border-color: #A30000 !important;
+}
+
+/* --- 6. PANEL BOCZNY (SIDEBAR) --- */
+[data-testid="stSidebar"] {
+    background-color: #EFECE6 !important;
+    border-right: 1px solid #C5BCB0 !important;
+}
+
+.sidebar-profile-card {
+    background-color: #FFFFFF;
+    border: 1px solid #C5BCB0;
+    border-radius: 12px;
+    padding: 12px;
+    text-align: center;
+}
+
+/* --- 7. STOPKA SYSTEMOWA --- */
+.footer-fixed {
+    position: fixed;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    background-color: #F4F1EA !important;
+    border-top: 2px solid #8B0000 !important;
+    padding: 10px 20px;
+    box-sizing: border-box;
+    z-index: 9999;
+}
