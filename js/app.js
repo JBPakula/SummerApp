@@ -385,7 +385,7 @@ function setupAddPlaceForm() {
     form.onsubmit = async (e) => {
       e.preventDefault();
       const name = document.getElementById("newPlaceName").value.trim();
-      const category = document.getElementById("newPlaceCategory").value;
+      const category = document.getElementById("newPlaceCategory").value || "Inne";
       if (!name || !selectedLatLng) return;
 
       const { error } = await supabaseClient.from("map").insert({
