@@ -1,6 +1,7 @@
 # app.py
 from datetime import datetime, timezone
 import os
+import base64
 import streamlit as st
 import folium
 from streamlit_folium import st_folium
@@ -9,8 +10,8 @@ from supabase import create_client, Client
 import extra_streamlit_components as stx
 
 # --- POŁĄCZENIE Z SUPABASE ---
-URL_SUPABASE = "https://mkysisoznxgssakcegbn.supabase.co"
-KEY_SUPABASE = "sb_publishable_4lljAeNc5dvmsJG2u1-pgQ_zCnATIE1"
+URL_SUPABASE = st.secrets["SUPABASE_URL"]
+KEY_SUPABASE = st.secrets["SUPABASE_KEY"]
 
 @st.cache_resource
 def inicjalizuj_supabase() -> Client:
@@ -33,18 +34,9 @@ wczytaj_style_css()
 # Menedżer ciasteczek
 cookie_manager = stx.CookieManager()
 
-# --- MATRYCE SYSTEMOWE ---
-HASLA = {
-    "Asia": "Asia123", "Maciek": "Maciek123", "Justyna": "Justyna123", 
-    "Artur": "Artur123", "Gosia": "Gosia123", "Mateusz": "Maciek123",
-    "Radek": "Radek123", "Ola": "Ola123"
-}
+# --- MATRYCE SYSTEMOWE (POBIERANIE Z SECRETS) ---
+HASLA = st.secrets["passwords"]
 
-STYLE_AVATAROW = {
-    "Asia": "adventurer", "Maciek": "bottts", "Justyna": "pixel-art", 
-    "Artur": "avataaars", "Gosia": "lorelei", "Mateusz": "micah", 
-    "Radek": "open-peeps", "Ola": "shapes"
-}
 
 LICZBA_OSOB_W_EKIPIE = {"Całe Stado": 15, "Bobry": 3, "Pakuły": 4, "Robaki": 4, "Sileziny": 4}
 
@@ -99,38 +91,95 @@ if st.session_state.zalogowany_user is None:
 
 # LOGOWANIE
 if st.session_state.zalogowany_user is None:
-    # Tylko główny nagłówek "Wakacje Stada" bez dodatkowego zdania pod spodem
-    st.markdown("""
+    st.markdown(
+        """
         <div style='margin-top: 40px;'>
             <h1 class="login-header-title">Wakacje Stada</h1>
         </div>
-    """, unsafe_allow_html=True)
-    
+    """,
+        unsafe_allow_html=True,
+    )
+
     with st.form("logowanie_form"):
         wybrane_imie = st.selectbox("Kim jesteś?", list(HASLA.keys()))
         wpisane_haslo = st.text_input("Hasło:", type="password")
-        if st.form_submit_button("Wejdź do aplikacji", use_container_width=True) and wpisane_haslo == HASLA[wybrane_imie]:
-            try: res = supabase.table("users").select("id").eq("login", wybrane_imie).execute()
-            except: res = supabase.table("Users").select("id").eq("login", wybrane_imie).execute()
-            if res.data:
-                uid = res.data[0]["id"]
-                st.session_state.user_id = uid
-                st.session_state.zalogowany_user = wybrane_imie
-                expires_date = datetime(2026, 8, 31)
-                cookie_manager.set("stado_user", wybrane_imie, expires_at=expires_date, key="set_user")
-                cookie_manager.set("stado_uid", str(uid), expires_at=expires_date, key="set_uid")
-                st.rerun()
+        przycisk_zaloguj = st.form_submit_button(
+            "Wejdź do aplikacji", use_container_width=True
+        )
+
+        if przycisk_zaloguj:
+            prawidlowe_haslo = str(HASLA.get(wybrane_imie, "")).strip()
+
+            if wpisane_haslo.strip() != prawidlowe_haslo:
+                st.error("❌ Nieprawidłowe hasło! Spróbuj ponownie.")
+            else:
+                try:
+                    res = (
+                        supabase.table("users")
+                        .select("id, login")
+                        .ilike("login", wybrane_imie)
+                        .execute()
+                    )
+
+                    if res.data and len(res.data) > 0:
+                        uid = res.data[0]["id"]
+                        st.session_state.user_id = uid
+                        st.session_state.zalogowany_user = wybrane_imie
+
+                        expires_date = datetime(2026, 8, 31)
+                        try:
+                            cookie_manager.set(
+                                "stado_user",
+                                wybrane_imie,
+                                expires_at=expires_date,
+                                key="set_user",
+                            )
+                            cookie_manager.set(
+                                "stado_uid",
+                                str(uid),
+                                expires_at=expires_date,
+                                key="set_uid",
+                            )
+                        except Exception:
+                            pass
+
+                        st.success(f"Witaj {wybrane_imie}! Logowanie...")
+                        st.rerun()
+                    else:
+                        st.error(
+                            f"❌ Nie znaleziono użytkownika '{wybrane_imie}' w tabeli 'users' w bazie!"
+                        )
+                except Exception as e:
+                    st.error(f"❌ Błąd połączenia z bazą: {e}")
+
     st.stop()
     
 user_aktualny = st.session_state.zalogowany_user
 id_aktualny = st.session_state.user_id
 team_aktualny = EKIPY.get(user_aktualny, "Pakuły")
-avatar_url = f"https://api.dicebear.com/7.x/{STYLE_AVATAROW.get(user_aktualny, 'initials')}/svg?seed={user_aktualny}"
+
+
+def pobierz_avatar_src(login):
+    """Zwraca lokalne zdjęcie zakodowane w base64 lub fallback SVG."""
+    katalog = os.path.join("assets", "avatars")
+    for ext in [".jpg", ".jpeg", ".png", ".JPG", ".JPEG", ".PNG"]:
+        sciezka = os.path.join(katalog, f"{login}{ext}")
+        if os.path.exists(sciezka):
+            with open(sciezka, "rb") as img_file:
+                b64_data = base64.b64encode(img_file.read()).decode("utf-8")
+            mime = "image/png" if ext.lower() == ".png" else "image/jpeg"
+            return f"data:{mime};base64,{b64_data}"
+
+    return f"https://api.dicebear.com/7.x/initials/svg?seed={login}"
+
+
+# Pobieramy zakodowane zdjęcie aktualnego użytkownika
+avatar_url = pobierz_avatar_src(user_aktualny)
 
 # --- LEWY PANEL BOCZNY (SIDEBAR) ---
 st.sidebar.markdown(f"""
     <div class="sidebar-profile-card">
-        <img src="{avatar_url}" width="75">
+        <img src="{avatar_url}">
         <h4 style="margin: 10px 0 2px 0; color: #2D2D2D;">{user_aktualny} 👋</h4>
         <span style="color: #666; font-size: 13px;">Team: <b style="color:#8B0000;">{team_aktualny}</b></span>
     </div>

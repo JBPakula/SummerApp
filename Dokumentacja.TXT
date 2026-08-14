@@ -1,0 +1,62 @@
+========================================================================
+             DOKUMENTACJA PROJEKTU: APLIKACJA "WAKACJE STADA 2026"
+========================================================================
+Ostatnia aktualizacja: 07.07.2026 r.
+Autor: JBP
+Status projektu: Gotowy szkielet logiki (Przed wdrożeniem security/RLS i frontu)
+
+1. STOS TECHNOLOGICZNY (TECH STACK)
+------------------------------------------------------------------------
+* Frontend & App Framework: Streamlit (z opcją Mobile First - układ centered).
+* Baza danych (Backend): Supabase (PostgreSQL) — komunikacja przez oficjalną 
+  bibliotekę `supabase-py`.
+* Mapy i Geokalizacja: Folium + Streamlit-Folium do interaktywnej wizualizacji.
+* Zarządzanie sesją/uwierzytelnianie: Extra Streamlit Components (CookieManager) 
+  do trwałego przechowywania sesji w przeglądarce (autologowanie).
+* Dane kursów walut: Frankfurter API (dynamiczne pobieranie kursów rynkowych).
+
+2. STRUKTURA BAZY DANYCH (SUPABASE REPOSITORIES)
+------------------------------------------------------------------------
+* users / Users: id (int), login (text), spouse_id (int), team (text).
+* map / Map: id, name, category, address, lat, lng, created_by.
+* costs / Costs: id, created_by, paid_by, amount, currency, cost_name, 
+  borrower, is_private, comment, deleted (boolean).
+* shoppinglists / shoppingitems: Struktura relacyjna list i produktów z 
+  flagą bought (boolean).
+* games / gamescores: Struktura turniejowa (gra, runda, punkty per gracz).
+* packing / forum: Proste tabele komentarzy i wpisów (log, stworzony przez).
+
+3. ZAKRES FUNKCJONALNOŚCI (MODUŁY I LOGIKA BIZNESOWA)
+------------------------------------------------------------------------
+A. Tryby aplikacji (Dynamic Sidebar)
+   - Przygotowanie: Odliczanie dni do wyjazdu (19.08.2026). Filtruje zakładki.
+   - Na wyjeździe: Pełen dostęp do modułów rozliczeniowych i turniejowych.
+B. Interaktywna Mapa
+   - Integracja bazy Ámbitus ház w Egerszalók.
+   - Przycisk "🏠 Dom" resetujący widok mapy do punktu startowego.
+   - Wyświetlanie numerowanych pinezek (#1, #2...) bezpośrednio na mapie.
+   - Spis atrakcji w formie estetycznych tekstowych hiperlinków (w locie 
+     centrują i przybliżają mapę na dany obiekt).
+   - Możliwość kliknięcia w dowolne miejsce na mapie i dodania nowego punktu.
+C. Koszykowy Portfel (Mechanizm Paragonu i Bilansowania Rodzinnego)
+   - Praca na strukturach zespołów (Teamów): Pakuły, Bobry, Sileziny, Robaki.
+   - Algorytm podziału kosztów dla "Całego Stada" (dzielone na 15 osób):
+     * Pakuły, Sileziny, Robaki: 4 * (kwota / 15)
+     * Bobry: 3 * (kwota / 15)
+   - Precyzyjne ujęcie przepływu gotówki: wydatki dodane przez danego użytkownika 
+     zalicza jako jego osobisty wkład, pomijając generowanie długu u współmałżonka.
+   - Prezentacja danych w formie czytelnego paragonu (Rozbicie per waluta: 
+     HUF, PLN, EUR) bez zbędnych opisów kontekstowych.
+   - Podsumowanie i bilans końcowy (RAZEM) podawany ZAWSZE w PLN, przeliczany 
+     dynamicznie według kursów ustalonych w zakładce Kantor.
+D. Inteligentna Lista Zakupowa
+   - Odznaczenie ostatniego kupionego produktu automatycznie wywołuje bliźniaczy 
+     formularz dodawania wydatków bezpośrednio pod listą.
+   - Zatwierdzenie formularza zasila główną tabelę kosztów (`costs`) według 
+     algorytmu Portfela i trwale zamyka listę przed edycją.
+E. Płacimy Razem i Kantor
+   - Kalkulator biletów (normalne/ulgowe) z podziałem na koszty rodzinne.
+   - Możliwość nadpisania rynkowego kursu walut własnym kursem z kantoru.
+F. Turniej Gier (Logika Blocus)
+   - Rejestracja rund i punktów. Przy wyborze gry "Blocus" tabela wyników końcowych 
+     jest automatycznie odwracana (mniej punktów = wyższa pozycja).

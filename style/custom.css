@@ -101,6 +101,15 @@ button:hover {
     text-align: center;
 }
 
+.sidebar-profile-card img {
+    width: 75px;
+    height: 75px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-bottom: 8px;
+    border: 2px solid #C5BCB0;
+}
+
 /* --- 7. STOPKA SYSTEMOWA --- */
 .footer-fixed {
     position: fixed;
