@@ -767,21 +767,91 @@ function przeliczBilety() {
   `;
 }
 
+window.setKantorAmount = function(val) {
+  const input = document.getElementById("exAmount");
+  if (input) {
+    input.value = val;
+    przeliczKantor();
+  }
+};
+
 function przeliczKantor() {
   const amt = parseFloat(document.getElementById("exAmount").value) || 0;
   const from = document.getElementById("exFrom").value;
   const to = document.getElementById("exTo").value;
-  const rate = bazaKursow[`${from}_${to}`] || 1.0;
+  const customToggle = document.getElementById("exCustomToggle");
+  const isCustom = customToggle ? customToggle.checked : false;
+  const customRateInput = document.getElementById("exCustomRateInput");
+  
+  let rate = bazaKursow[`${from}_${to}`] || 1.0;
+  let rateLabelPrefix = "Kurs rynkowy (EBC)";
+
+  if (from === to) {
+    rate = 1.0;
+  } else if (isCustom) {
+    const customVal = parseFloat(customRateInput.value);
+    if (!isNaN(customVal) && customVal > 0) {
+      rate = customVal;
+      rateLabelPrefix = "Własny kurs";
+    }
+  }
+
   const res = amt * rate;
+  const formattedRes = to === "HUF" 
+    ? Math.round(res).toLocaleString('pl-PL') 
+    : res.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   document.getElementById("exResult").innerHTML = `
-    <div class="small text-muted mb-1">1 ${from} = ${rate.toFixed(4)} ${to}</div>
-    <div class="fs-4 fw-bold" style="color:var(--burgund);">${res.toFixed(2)} ${to}</div>
+    <div class="small text-muted mb-1">${rateLabelPrefix}: 1 ${from} = ${rate.toFixed(4)} ${to}</div>
+    <div class="fs-4 fw-bold" style="color:var(--burgund);">${formattedRes} ${to}</div>
   `;
+
+  renderCheatsheet(from, to, rate);
+}
+
+function renderCheatsheet(from, to, rate) {
+  const tbody = document.getElementById("cheatsheetBody");
+  const rateInfo = document.getElementById("cheatsheetRateInfo");
+  if (!tbody) return;
+
+  if (rateInfo) {
+    rateInfo.innerText = `1 ${from} = ${rate.toFixed(4)} ${to}`;
+  }
+
+  let sampleAmounts = [];
+  if (from === "HUF") {
+    sampleAmounts = [500, 1000, 2000, 5000, 10000, 20000, 50000];
+  } else if (from === "PLN") {
+    sampleAmounts = [10, 20, 50, 100, 200, 500, 1000];
+  } else if (from === "EUR") {
+    sampleAmounts = [5, 10, 20, 50, 100, 200, 500];
+  } else {
+    sampleAmounts = [1, 5, 10, 50, 100, 500];
+  }
+
+  tbody.innerHTML = sampleAmounts.map(amount => {
+    const converted = amount * rate;
+    const formattedFrom = amount.toLocaleString('pl-PL');
+    const formattedTo = to === "HUF" 
+      ? Math.round(converted).toLocaleString('pl-PL') 
+      : converted.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    return `
+      <tr class="border-bottom">
+        <td class="fw-bold py-2" style="color: var(--burgund); width: 50%;">
+          ${formattedFrom} ${from}
+        </td>
+        <td class="text-end fw-bold py-2" style="width: 50%;">
+          = ${formattedTo} ${to}
+        </td>
+      </tr>
+    `;
+  }).join("");
 }
 
 async function loadForum() {
-  const container = document.getElementById("forumMessages");
+    const container = document.getElementById("forumMessages");
+  if (!container) return;
   container.innerHTML = "";
   const { data } = await supabaseClient.from("forum").select("comment, created_by, users(login)").order("created_at", { ascending: false });
 
@@ -795,15 +865,6 @@ async function loadForum() {
     });
   }
 }
-
-document.getElementById("btnSendForum").onclick = async () => {
-  const input = document.getElementById("forumInput");
-  if (!input.value.trim()) return;
-
-  await supabaseClient.from("forum").insert({ created_by: currentUserId, comment: input.value.trim() });
-  input.value = "";
-  loadForum();
-};
 
 // ==============================================================================
 // 9. EVENT LISTENERS
@@ -825,8 +886,51 @@ function setupEventListeners() {
     if (el) el.addEventListener("input", przeliczBilety);
   });
 
-  ["exAmount", "exFrom", "exTo"].forEach(id => {
+  const customToggle = document.getElementById("exCustomToggle");
+  const customRateContainer = document.getElementById("exCustomRateContainer");
+  const customRateInput = document.getElementById("exCustomRateInput");
+  const customRateLabel = document.getElementById("exCustomRateLabel");
+
+  if (customToggle) {
+    customToggle.onchange = () => {
+      const isCustom = customToggle.checked;
+      if (customRateContainer) customRateContainer.style.display = isCustom ? "block" : "none";
+      
+      const from = document.getElementById("exFrom").value;
+      const to = document.getElementById("exTo").value;
+      const defaultRate = bazaKursow[`${from}_${to}`] || 1.0;
+
+      if (isCustom && customRateInput && customRateLabel) {
+        customRateInput.value = defaultRate.toFixed(4);
+        customRateLabel.innerText = `Własny kurs (1 ${from} = ? ${to}):`;
+      } else if (customRateInput) {
+        customRateInput.value = "";
+      }
+      
+      przeliczKantor();
+    };
+  }
+
+  const updateCustomLabel = () => {
+    const from = document.getElementById("exFrom").value;
+    const to = document.getElementById("exTo").value;
+    if (customRateLabel) {
+      customRateLabel.innerText = `Własny kurs (1 ${from} = ? ${to}):`;
+    }
+    if (customToggle && customToggle.checked && customRateInput) {
+      const defaultRate = bazaKursow[`${from}_${to}`] || 1.0;
+      customRateInput.value = defaultRate.toFixed(4);
+    }
+    przeliczKantor();
+  };
+
+  ["exAmount", "exCustomRateInput"].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.addEventListener("input", przeliczKantor);
+  });
+
+  ["exFrom", "exTo"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener("change", updateCustomLabel);
   });
 }
