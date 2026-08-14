@@ -1,130 +1,209 @@
-/* style/custom.css */
-
-/* --- 1. PEŁNE TŁO WIDOKU (WINNICA) NA EKRANIE LOGOWANIA --- */
-html:has(input[type="password"]) [data-testid="stAppViewContainer"] {
-    background-image: linear-gradient(rgba(0, 0, 0, 0.25), rgba(0, 0, 0, 0.35)), 
-                     url('https://i.wpimg.pl/c/640x480/filerepo.grupawp.pl/api/v1/display/embed/9526bce4-5cc4-4f5f-9925-1813884ed79c') !important;
-    background-size: cover !important;
-    background-position: center center !important;
-    background-repeat: no-repeat !important;
-    background-attachment: fixed !important;
+/* css/style.css */
+:root {
+  --burgund: #8B0000;
+  --burgund-hover: #6e0000;
+  --tlo-jasne: #F4F1EA;
+  --karta-bg: #FFFFFF;
+  --ramka: #C5BCB0;
+  --tekst: #2D2D2D;
 }
 
-/* Tło dla zalogowanego użytkownika (Ciepły piasek / beż) */
-[data-testid="stAppViewContainer"] {
-    background-color: #F4F1EA !important;
+body {
+  background-color: var(--tlo-jasne);
+  color: var(--tekst);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  margin: 0;
+  padding-bottom: 70px; /* Miejsce na stopkę */
 }
 
-/* --- 2. EKRAN LOGOWANIA (PRZEZROCZYSTA SZKLANA KARTA) --- */
-div[data-testid="stForm"]:has(input[type="password"]) {
-    background: rgba(255, 255, 255, 0.35) !important; /* Obniżona nieprzezroczystość dla efektu szkła */
-    backdrop-filter: blur(16px) !important;
-    -webkit-backdrop-filter: blur(16px) !important;
-    border: 1px solid rgba(255, 255, 255, 0.4) !important;
-    border-radius: 20px !important;
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3) !important;
-    padding: 30px !important;
-    max-width: 420px !important;
-    margin: 80px auto 0 auto !important;
+/* Karta profilowa w offcanvasie / sidebarze */
+.profile-card {
+  background: white;
+  border: 1px solid var(--ramka);
+  border-radius: 12px;
+  padding: 12px;
+  text-align: center;
+  margin-bottom: 15px;
 }
 
-/* Nowoczesny, jasny i czytelny tytuł nad formularzem */
-.login-header-title {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
-    font-weight: 800 !important;
-    color: #FFFFFF !important;
-    font-size: 36px !important;
-    text-align: center;
-    letter-spacing: -0.5px;
-    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
-    margin-bottom: 30px !important; /* Dystans bezpośrednio do pól formularza */
+.profile-avatar {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--ramka);
+  margin-bottom: 8px;
 }
 
-/* --- 3. FIX DLA BRZYDKIEGO PRZYCISKU POKAŻ HASŁO --- */
-/* Usuwamy czarne tło i dopasowujemy kontener przycisku oka do inputu */
-div[data-testid="stTextInput"] div[role="button"] {
-    background-color: transparent !important;
-    background: transparent !important;
-    border: none !important;
-    color: #8B0000 !important; /* Burgundowe oko */
+/* Przyciski i elementy akcentowe */
+.btn-burgund {
+  background-color: var(--burgund);
+  color: #FFFFFF;
+  border: 1px solid var(--burgund);
+  font-weight: 600;
+  border-radius: 10px;
 }
 
-/* --- 4. PEŁNY KONTRAST ETYKIET I INPUTÓW --- */
-label, [data-testid="stWidgetLabel"] p, .stWidgetLabel {
-    color: #111111 !important; 
-    font-weight: 700 !important;
-    font-size: 14px !important;
-    text-shadow: none !important;
+.btn-burgund:hover, .btn-burgund:focus {
+  background-color: var(--burgund-hover);
+  color: #FFFFFF;
 }
 
-input, select, textarea, [data-baseweb="select"], [data-baseweb="input"] {
-    background-color: #FFFFFF !important;
-    color: #111111 !important;
-    border: 1px solid #C5BCB0 !important;
-    border-radius: 10px !important;
+/* Karty wydatków */
+.stado-card {
+  background: #FFFFFF;
+  border-radius: 12px;
+  border-left: 5px solid var(--burgund);
+  padding: 12px 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
 
-/* Usunięcie brzydkich klocków z widgetu liczbowego */
-[data-testid="stNumberInput"] button {
-    background-color: #F4F1EA !important;
-    color: #111111 !important;
-    border: 1px solid #C5BCB0 !important;
+.stado-card-private {
+  background: #FFF8F0;
+  border-radius: 12px;
+  border-left: 5px solid #E67E22;
+  padding: 12px 16px;
+  margin-bottom: 12px;
 }
 
-/* --- 5. PRZYCISKI (BURGUND EGERSKI) --- */
-button, [data-testid="baseButton-secondary"], [data-testid="baseButton-primary"] {
-    background-color: #8B0000 !important; 
-    color: #FFFFFF !important;
-    border-radius: 10px !important;
-    border: 1px solid #8B0000 !important;
-    font-weight: 700 !important;
-    padding: 10px 20px !important;
-    box-shadow: 0 4px 8px rgba(139, 0, 0, 0.2) !important;
+/* Czat forum */
+.chat-bubble {
+  border-radius: 14px;
+  padding: 10px 14px;
+  margin-bottom: 10px;
+  max-width: 85%;
 }
 
-button:hover {
-    background-color: #A30000 !important;
-    border-color: #A30000 !important;
+.chat-bubble-sent {
+  background-color: #E8F5E9;
+  border: 1px solid #C8E6C9;
+  margin-left: auto;
 }
 
-/* --- 6. PANEL BOCZNY (SIDEBAR) --- */
-[data-testid="stSidebar"] {
-    background-color: #EFECE6 !important;
-    border-right: 1px solid #C5BCB0 !important;
+.chat-bubble-received {
+  background-color: #FFFFFF;
+  border: 1px solid var(--ramka);
+  margin-right: auto;
 }
 
-.sidebar-profile-card {
+/* Stopka stała na dole */
+.footer-fixed {
+  position: fixed;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  background-color: var(--tlo-jasne);
+  border-top: 2px solid var(--burgund);
+  padding: 10px 15px;
+  z-index: 1030;
+  font-size: 11px;
+}
+
+/* --- 8. PROFIL UŻYTKOWNIKA W SIDEBARZE --- */
+.profile-card {
     background-color: #FFFFFF;
     border: 1px solid #C5BCB0;
-    border-radius: 12px;
-    padding: 12px;
+    border-radius: 14px;
+    padding: 16px;
     text-align: center;
+    margin-bottom: 15px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
 }
 
-.sidebar-profile-card img {
-    width: 75px;
-    height: 75px;
+.profile-avatar {
+    width: 72px;
+    height: 72px;
     border-radius: 50%;
     object-fit: cover;
     margin-bottom: 8px;
-    border: 2px solid #C5BCB0;
+    border: 2px solid var(--burgund, #8B0000);
+    background-color: #F4F1EA;
+    display: inline-block;
 }
 
-/* --- 7. STOPKA SYSTEMOWA --- */
+/* --- 9. ZMIENNE I STYL KAFLI PULPITU (WINNICA + PŁYNNE PRZEJŚCIE) --- */
+:root {
+    --burgund: #8B0000;
+    --burgund-hover: #700000;
+}
+
+body {
+    background-color: #FFFFFF !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #2D2D2D;
+}
+
+/* Tło pejzażu z płynnym przejściem od bieli do winnicy na dole */
+#tab-dashboard {
+    min-height: calc(100vh - 120px);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    background-image: 
+        linear-gradient(
+            to bottom,
+            #FFFFFF 0%,
+            #FFFFFF 28%,
+            rgba(255, 255, 255, 0.85) 50%,
+            rgba(255, 255, 255, 0.2) 75%,
+            rgba(255, 255, 255, 0) 100%
+        ),
+        url('../assets/landscape.webp');
+    background-size: cover;
+    background-position: center bottom;
+    background-repeat: no-repeat;
+    border-radius: 16px;
+    padding-bottom: 30px;
+}
+
+.dashboard-logo {
+    max-height: 65px;
+    object-fit: contain;
+}
+
+/* Kafelki: czytelna, lekka biel z subtelnym cieniem */
+.dashboard-card {
+    background: rgba(255, 255, 255, 0.92) !important;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border: 1px solid rgba(197, 188, 176, 0.8) !important;
+    border-radius: 12px !important;
+    transition: transform 0.12s ease, background-color 0.12s ease;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.dashboard-card:active {
+    transform: scale(0.97);
+    background-color: #FFFFFF !important;
+    border-color: var(--burgund) !important;
+}
+
+.tile-title {
+    color: var(--burgund);
+    font-size: 0.95rem;
+    line-height: 1.2;
+}
+
+.tile-desc {
+    font-size: 0.72rem;
+    margin-top: 2px;
+    line-height: 1.1;
+}
+
 .footer-fixed {
     position: fixed;
     left: 0;
     bottom: 0;
     width: 100%;
-    background-color: #F4F1EA !important;
-    border-top: 2px solid #8B0000 !important;
-    padding: 10px 20px;
+    background-color: rgba(255, 255, 255, 0.95) !important;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-top: 1px solid #E5E5E5 !important;
+    padding: 8px 16px;
     box-sizing: border-box;
     z-index: 9999;
-}
-
-
-/* Maskowanie kropek w polu hasła bez wywoływania menedżera haseł Chrome */
-div[data-testid="stTextInput"] input[aria-label="Hasło:"] {
-    -webkit-text-security: disc !important;
+    font-size: 0.8rem;
 }

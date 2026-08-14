@@ -101,13 +101,24 @@ async function checkAuth() {
 
 async function verifyAndLogin(userName, password) {
   try {
-    const { data, error } = await supabaseClient
-      .from("users")
-      .select("id, login, team, passcode")
-      .ilike("login", userName.trim())
-      .eq("passcode", password.trim());
+    console.log("Próba logowania dla:", userName.trim());
 
-    if (error || !data || data.length === 0) return false;
+    const { data, error } = await supabaseClient.rpc("login_user", {
+      p_login: userName.trim(),
+      p_passcode: password.trim()
+    });
+
+    console.log("Odpowiedź z bazy (RPC):", { data, error });
+
+    if (error) {
+      console.error("Błąd RPC z Supabase:", error.message, error.details);
+      return false;
+    }
+
+    if (!data || data.length === 0) {
+      console.warn("Brak pasującego rekordu dla podanych danych.");
+      return false;
+    }
 
     const userData = data[0];
     currentUser = userData.login;
@@ -121,14 +132,32 @@ async function verifyAndLogin(userName, password) {
     document.getElementById("appSection").style.display = "block";
     document.getElementById("userNameDisplay").innerText = currentUser + " 👋";
     document.getElementById("userTeamDisplay").innerText = currentTeam;
-    document.getElementById("userAvatar").src = `assets/avatars/${currentUser}.png`;
+
+    // Inteligentne ładowanie awatara (obsługa .jpg, .jpeg, .png oraz fallback)
+    const avatarEl = document.getElementById("userAvatar");
+    const extensions = ["jpg", "jpeg", "png"];
+    let extIndex = 0;
+
+    function tryLoadAvatar() {
+      if (extIndex < extensions.length) {
+        avatarEl.src = `assets/avatars/${currentUser}.${extensions[extIndex]}`;
+        extIndex++;
+      } else {
+        // Fallback: jeśli żaden format nie istnieje
+        avatarEl.onerror = null;
+        avatarEl.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser)}&background=8B0000&color=fff&size=128&bold=true`;
+      }
+    }
+
+    avatarEl.onerror = tryLoadAvatar;
+    tryLoadAvatar();
 
     renderNavigation();
     initMap();
     loadCosts();
     return true;
   } catch (e) {
-    console.error("Błąd autoryzacji:", e);
+    console.error("Wyjątek podczas autoryzacji:", e);
     return false;
   }
 }
@@ -165,15 +194,23 @@ document.getElementById("btnLogout").addEventListener("click", () => {
 // ==============================================================================
 // 3. NAWIGACJA
 // ==============================================================================
-const TABS_PREP = ["🗺️ Mapa", "🧳 Pakowanie", "💱 Kantor", "💬 Forum"];
-const TABS_TRIP = ["🗺️ Mapa", "💰 Wydatki", "🏦 Portfel", "🛒 Zakupy", "📊 Płacimy Razem", "💱 Kantor", "🎲 Rozgrywki", "💬 Forum"];
+const ALL_TABS = [
+  "🏠 Pulpit",
+  "🗺️ Mapa", 
+  "💰 Wydatki", 
+  "🏦 Portfel", 
+  "🛒 Zakupy", 
+  "📊 Płacimy Razem", 
+  "💱 Kantor", 
+  "🎲 Rozgrywki", 
+  "💬 Forum"
+];
 
 function renderNavigation() {
   const container = document.getElementById("navButtonsContainer");
   container.innerHTML = "";
-  const tabs = (currentMode === "Przygotowanie") ? TABS_PREP : TABS_TRIP;
 
-  tabs.forEach(tab => {
+  ALL_TABS.forEach(tab => {
     const btn = document.createElement("button");
     btn.className = "btn btn-outline-danger text-start fw-bold mb-1";
     btn.innerText = tab;
@@ -183,18 +220,44 @@ function renderNavigation() {
 }
 
 function switchTab(tabName) {
+  // Ukryj wszystkie sekcje
   document.querySelectorAll(".app-tab").forEach(el => el.style.display = "none");
-  const offcanvas = bootstrap.Offcanvas.getInstance(document.getElementById('sidebarMenu'));
+
+  // Zamknij sidebar jeśli otwarty
+  const offcanvasEl = document.getElementById('sidebarMenu');
+  const offcanvas = bootstrap.Offcanvas.getInstance(offcanvasEl);
   if (offcanvas) offcanvas.hide();
 
-  if (tabName.includes("Mapa")) { document.getElementById("tab-map").style.display = "block"; if (mapInstance) mapInstance.invalidateSize(); }
-  else if (tabName.includes("Wydatki")) { document.getElementById("tab-costs").style.display = "block"; loadCosts(); }
-  else if (tabName.includes("Portfel")) { document.getElementById("tab-wallet").style.display = "block"; loadWallet(); }
-  else if (tabName.includes("Zakupy")) { document.getElementById("tab-shopping").style.display = "block"; loadShoppingLists(); }
-  else if (tabName.includes("Płacimy Razem")) { document.getElementById("tab-tickets").style.display = "block"; przeliczBilety(); }
-  else if (tabName.includes("Kantor")) { document.getElementById("tab-exchange").style.display = "block"; przeliczKantor(); }
-  else if (tabName.includes("Rozgrywki")) { document.getElementById("tab-games").style.display = "block"; }
-  else if (tabName.includes("Forum") || tabName.includes("Pakowanie")) { document.getElementById("tab-forum").style.display = "block"; loadForum(); }
+  // Dopasowanie i pokazanie wybranej sekcji
+  if (tabName === "dashboard" || tabName.includes("Pulpit")) {
+    document.getElementById("tab-dashboard").style.display = "block";
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } else if (tabName.includes("Mapa")) {
+    document.getElementById("tab-map").style.display = "block";
+    if (mapInstance) {
+      setTimeout(() => mapInstance.invalidateSize(), 200);
+    }
+  } else if (tabName.includes("Wydatki")) {
+    document.getElementById("tab-costs").style.display = "block";
+    loadCosts();
+  } else if (tabName.includes("Portfel")) {
+    document.getElementById("tab-wallet").style.display = "block";
+    loadWallet();
+  } else if (tabName.includes("Zakupy")) {
+    document.getElementById("tab-shopping").style.display = "block";
+    loadShoppingLists();
+  } else if (tabName.includes("Płacimy Razem")) {
+    document.getElementById("tab-tickets").style.display = "block";
+    przeliczBilety();
+  } else if (tabName.includes("Kantor")) {
+    document.getElementById("tab-exchange").style.display = "block";
+    przeliczKantor();
+  } else if (tabName.includes("Rozgrywki")) {
+    document.getElementById("tab-games").style.display = "block";
+  } else if (tabName.includes("Forum")) {
+    document.getElementById("tab-forum").style.display = "block";
+    loadForum();
+  }
 }
 
 // ==============================================================================
