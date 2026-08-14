@@ -181,18 +181,63 @@
           </div>
         </div>
 
-        <!-- Dół: Zdjęcie winnicy dopasowujące się do dołu ekranu -->
-        <div class="dashboard-footer-image-wrapper mt-auto">
-          <img src="https://i.wpimg.pl/c/640x480/filerepo.grupawp.pl/api/v1/display/embed/9526bce4-5cc4-4f5f-9925-1813884ed79c" alt="Winnica Eger" class="dashboard-footer-image">
-        </div>
+       
       </section>
 
 <!-- Zakładka 1: Mapa -->
       <section id="tab-map" class="app-tab">
-        <div id="mapContainer" style="height: 380px; width: 100%; border-radius: 14px;" class="shadow-sm mb-3"></div>
+        <div id="mapContainer" style="height: 360px; width: 100%; border-radius: 14px;" class="shadow-sm mb-3"></div>
         <button id="btnCenterHome" class="btn btn-outline-dark btn-sm w-100 mb-3">🏠 Centruj na: Ámbitus ház (Dom)</button>
-        <h6 class="fw-bold mb-2">📌 Spis atrakcji:</h6>
+
+        <!-- Karta dodawania punktu -->
+        <div id="addPlaceCard" class="card p-3 border-0 shadow-sm rounded-4 mb-3" style="display: none; background: #FFFFFF; border-left: 5px solid var(--burgund) !important;">
+          <h6 class="fw-bold mb-2" style="color: var(--burgund);">📍 Dodaj nowy punkt</h6>
+          <form id="formAddPlace">
+            <div class="mb-2">
+              <label class="small fw-bold">Nazwa miejsca:</label>
+              <input type="text" id="newPlaceName" class="form-control form-control-sm" placeholder="np. Restauracja Piwnica" required>
+            </div>
+            <div class="mb-3">
+              <label class="small fw-bold">Kategoria:</label>
+              <select id="newPlaceCategory" class="form-select form-select-sm">
+                <option value="Zwiedzanie">🏛️ Zwiedzanie</option>
+                <option value="Termy">🏊 Termy</option>
+                <option value="Jedzenie">🍷 Jedzenie / Wino</option>
+                <option value="Inne">📌 Inne</option>
+              </select>
+            </div>
+            <div class="d-flex gap-2">
+              <button type="button" id="btnCancelAddPlace" class="btn btn-outline-secondary btn-sm w-50">Anuluj</button>
+              <button type="submit" class="btn btn-burgund btn-sm w-50">Zapisz punkt</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Filtry i Szukajka -->
+        <div class="mb-2">
+          <input type="text" id="placeSearchInput" class="form-control form-control-sm rounded-pill mb-2" placeholder="🔍 Szukaj atrakcji...">
+         <div class="d-flex gap-1 overflow-auto pb-1" id="categoryPills">
+            <button class="btn btn-sm btn-burgund rounded-pill px-3 filter-pill active" data-cat="termy">🏊 Termy</button>
+            <button class="btn btn-sm btn-outline-secondary rounded-pill px-3 filter-pill" data-cat="zwiedzanie">🏛️ Zwiedzanie</button>
+            <button class="btn btn-sm btn-outline-secondary rounded-pill px-3 filter-pill" data-cat="jedzenie">🍷 Jedzenie</button>
+            <button class="btn btn-sm btn-outline-secondary rounded-pill px-3 filter-pill" data-cat="inne">📌 Inne</button>
+            <button class="btn btn-sm btn-outline-secondary rounded-pill px-3 filter-pill" data-cat="all">All</button>
+          </div>
+        </div>
+
+        <!-- Spis atrakcji -->
         <div id="placesList" class="list-group shadow-sm rounded-3 mb-4"></div>
+
+        <!-- Wysuwany panel szczegółów (Bottom Sheet) -->
+        <div class="offcanvas offcanvas-bottom rounded-top-4" tabindex="-1" id="placeDetailsSheet" style="height: auto; max-height: 85vh;">
+          <div class="offcanvas-header border-bottom py-2">
+            <h6 class="offcanvas-title fw-bold" id="sheetPlaceTitle" style="color: var(--burgund);">Szczegóły miejsca</h6>
+            <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas"></button>
+          </div>
+          <div class="offcanvas-body" id="sheetPlaceBody">
+            <!-- Wypełniane dynamicznie w JS -->
+          </div>
+        </div>
       </section>
 
       <!-- 2. Zakładka: Wydatki -->

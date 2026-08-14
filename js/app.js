@@ -276,6 +276,11 @@ function switchTab(tabName) {
 // 4. MODUŁ: MAPA
 // ==============================================================================
 let domMarker = null;
+let tempMarker = null;
+let selectedLatLng = null;
+let allMapPlaces = [];
+let activeCategoryFilter = "termy";
+let currentSearchPhrase = "";
 const markersMap = {};
 
 function getCategoryPinIcon(category, number) {
@@ -286,6 +291,8 @@ function getCategoryPinIcon(category, number) {
     pinClass = 'pin-termy';
   } else if (cat.includes('zwiedzanie') || cat.includes('zabytek') || cat.includes('atrakcj')) {
     pinClass = 'pin-zwiedzanie';
+  } else if (cat.includes('jedzenie') || cat.includes('wino') || cat.includes('restaurac')) {
+    pinClass = 'pin-jedzenie';
   }
 
   return L.divIcon({
@@ -300,7 +307,7 @@ function getCategoryPinIcon(category, number) {
 function initMap() {
   if (mapInstance) return;
   
-  mapInstance = L.map('mapContainer').setView([DOM_LAT, DOM_LNG], 15);
+  mapInstance = L.map('mapContainer').setView([DOM_LAT, DOM_LNG], 13);
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap'
@@ -317,55 +324,247 @@ function initMap() {
   domMarker = L.marker([DOM_LAT, DOM_LNG], { icon: homeIcon }).addTo(mapInstance)
     .bindPopup('<b>🏠 Ámbitus ház (Dom)</b><br><small class="text-muted">Sáfrány út 38/a, Egerszalók</small>');
 
+  mapInstance.on('click', (e) => {
+    selectedLatLng = e.latlng;
+    if (tempMarker) mapInstance.removeLayer(tempMarker);
+
+    const tempIcon = L.divIcon({
+      className: 'custom-pin-wrapper',
+      html: `<div class="custom-pin" style="background-color: #f59e0b; width: 30px; height: 30px; font-size: 14px;">📍</div>`,
+      iconSize: [30, 30],
+      iconAnchor: [15, 15],
+      popupAnchor: [0, -15]
+    });
+
+    tempMarker = L.marker(selectedLatLng, { icon: tempIcon }).addTo(mapInstance);
+    tempMarker.bindPopup(`
+      <div class="text-center p-1" style="min-width: 140px;">
+        <div class="fw-bold mb-2" style="font-size: 12px;">Wybrany punkt</div>
+        <button id="btnPopupConfirm" class="btn btn-burgund btn-sm w-100 py-1 mb-1" style="font-size: 11px;">➕ Dodaj ten punkt</button>
+        <button id="btnPopupCancel" class="btn btn-outline-secondary btn-sm w-100 py-1" style="font-size: 11px;">❌ Anuluj</button>
+      </div>
+    `).openPopup();
+
+    setTimeout(() => {
+      const btnConfirm = document.getElementById("btnPopupConfirm");
+      const btnCancel = document.getElementById("btnPopupCancel");
+      if (btnConfirm) {
+        btnConfirm.onclick = () => {
+          tempMarker.closePopup();
+          const card = document.getElementById("addPlaceCard");
+          card.style.display = "block";
+          card.scrollIntoView({ behavior: "smooth", block: "center" });
+          document.getElementById("newPlaceName").focus();
+        };
+      }
+      if (btnCancel) btnCancel.onclick = usunTymczasowyPunkt;
+    }, 100);
+  });
+
+  setupAddPlaceForm();
+  setupFilterAndSearch();
   loadMapPlaces();
 }
 
-async function loadMapPlaces() {
-  const { data } = await supabaseClient.from("map").select("*");
-  const list = document.getElementById("placesList");
-  list.innerHTML = "";
+function usunTymczasowyPunkt() {
+  if (tempMarker) {
+    mapInstance.removeLayer(tempMarker);
+    tempMarker = null;
+  }
+  selectedLatLng = null;
+  document.getElementById("addPlaceCard").style.display = "none";
+  document.getElementById("formAddPlace").reset();
+}
 
-  if (data) {
-    data.forEach((p, index) => {
-      if (p.lat && p.lng) {
-        const pinNumber = index + 1;
-        const icon = getCategoryPinIcon(p.category, pinNumber);
+function setupAddPlaceForm() {
+  const btnCancel = document.getElementById("btnCancelAddPlace");
+  if (btnCancel) btnCancel.onclick = usunTymczasowyPunkt;
 
-        const marker = L.marker([p.lat, p.lng], { icon: icon }).addTo(mapInstance);
-        marker.bindPopup(`
-          <div style="min-width: 160px;">
-            <b style="color: var(--burgund);">#${pinNumber} ${p.name}</b>
-            ${p.address ? `<div class="small text-muted mt-1">📍 ${p.address}</div>` : ''}
-            <div class="badge bg-secondary mt-1">${p.category || 'Atrakcja'}</div>
-          </div>
-        `);
+  const form = document.getElementById("formAddPlace");
+  if (form) {
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const name = document.getElementById("newPlaceName").value.trim();
+      const category = document.getElementById("newPlaceCategory").value;
+      if (!name || !selectedLatLng) return;
 
-        markersMap[p.id] = marker;
+      const { error } = await supabaseClient.from("map").insert({
+        name: name,
+        category: category,
+        lat: selectedLatLng.lat,
+        lng: selectedLatLng.lng,
+        created_by: currentUserId
+      });
 
-        const item = document.createElement("button");
-        item.className = "list-group-item list-group-item-action d-flex justify-content-between align-items-center py-2";
-        item.innerHTML = `
-          <div>
-            <b>#${pinNumber}</b> ${p.name}
-            ${p.address ? `<div class="small text-muted">${p.address}</div>` : ''}
-          </div>
-          <span class="badge ${p.category && p.category.toLowerCase().includes('term') ? 'bg-primary' : 'bg-secondary'}">${p.category || ''}</span>
-        `;
-
-        item.onclick = () => {
-          // 1. Płynne przewinięcie ekranu do samej mapy
-          document.getElementById("mapContainer").scrollIntoView({ behavior: "smooth", block: "start" });
-          
-          // 2. Wycentrowanie mapy na punkcie z dużym zbliżeniem i otwarcie etykiety
-          mapInstance.setView([p.lat, p.lng], 16);
-          marker.openPopup();
-        };
-
-        list.appendChild(item);
+      if (error) {
+        alert("Błąd zapisu: " + error.message);
+        return;
       }
-    });
+
+      usunTymczasowyPunkt();
+      loadMapPlaces();
+    };
   }
 }
+
+function setupFilterAndSearch() {
+  const searchInput = document.getElementById("placeSearchInput");
+  if (searchInput) {
+    searchInput.oninput = (e) => {
+      currentSearchPhrase = e.target.value.toLowerCase().trim();
+      renderPlacesList();
+    };
+  }
+
+  const pills = document.querySelectorAll(".filter-pill");
+  pills.forEach(pill => {
+    pill.onclick = () => {
+      pills.forEach(p => {
+        p.className = "btn btn-sm btn-outline-secondary rounded-pill px-3 filter-pill";
+      });
+      pill.className = "btn btn-sm btn-burgund rounded-pill px-3 filter-pill active";
+      activeCategoryFilter = pill.getAttribute("data-cat");
+      renderPlacesList();
+    };
+  });
+}
+
+async function loadMapPlaces() {
+  const { data } = await supabaseClient.from("map").select("*").order("id", { ascending: true });
+  if (!data) return;
+
+  allMapPlaces = data;
+
+  // Czyścimy stare markery przed narysowaniem
+  Object.values(markersMap).forEach(m => mapInstance.removeLayer(m));
+
+  allMapPlaces.forEach((p, index) => {
+    if (p.lat && p.lng) {
+      const pinNumber = index + 1;
+      const icon = getCategoryPinIcon(p.category, pinNumber);
+      const marker = L.marker([p.lat, p.lng], { icon: icon }).addTo(mapInstance);
+
+      // Miniaturka w dymku na mapie
+      const popupHtml = `
+        <div style="min-width: 170px; max-width: 220px;">
+          ${p.photo ? `<img src="${p.photo}" class="map-popup-img" alt="Foto">` : ''}
+          <div class="fw-bold" style="color: var(--burgund);">#${pinNumber} ${p.name}</div>
+          ${p.distance_from_egerszalok ? `<div class="small text-muted">🚗 ${p.distance_from_egerszalok} km z domu</div>` : ''}
+          <button class="btn btn-outline-danger btn-sm w-100 py-1 mt-2" style="font-size: 11px;" onclick="window.pokazSzczegolyMiejsca(${p.id})">
+            📄 Pokaż szczegóły
+          </button>
+        </div>
+      `;
+
+      marker.bindPopup(popupHtml);
+      markersMap[p.id] = marker;
+    }
+  });
+
+  renderPlacesList();
+}
+
+function renderPlacesList() {
+  const list = document.getElementById("placesList");
+  if (!list) return;
+  list.innerHTML = "";
+
+  const filtered = allMapPlaces.filter((p) => {
+    const matchesSearch = !currentSearchPhrase || (p.name && p.name.toLowerCase().includes(currentSearchPhrase)) || (p.address && p.address.toLowerCase().includes(currentSearchPhrase));
+    
+    let matchesCategory = true;
+    const cat = (p.category || '').toLowerCase();
+    if (activeCategoryFilter === 'termy') matchesCategory = cat.includes('term');
+    else if (activeCategoryFilter === 'zwiedzanie') matchesCategory = cat.includes('zwiedzanie') || cat.includes('zabytek') || cat.includes('atrakcj');
+    else if (activeCategoryFilter === 'jedzenie') matchesCategory = cat.includes('jedzenie') || cat.includes('wino') || cat.includes('restaurac');
+    else if (activeCategoryFilter === 'inne') matchesCategory = !cat.includes('term') && !cat.includes('zwiedzanie') && !cat.includes('zabytek') && !cat.includes('jedzenie') && !cat.includes('wino');
+
+    return matchesSearch && matchesCategory;
+  });
+
+  if (filtered.length === 0) {
+    list.innerHTML = `<div class="p-3 text-center text-muted small">Brak miejsc spełniających kryteria.</div>`;
+    return;
+  }
+
+  filtered.forEach((p) => {
+    const pinNumber = allMapPlaces.indexOf(p) + 1;
+    const item = document.createElement("button");
+    item.className = "list-group-item list-group-item-action d-flex justify-content-between align-items-center py-2";
+    item.innerHTML = `
+      <div class="text-start pe-2">
+        <div><b>#${pinNumber}</b> ${p.name}</div>
+        <div class="small text-muted">${p.distance_from_egerszalok ? `🚗 ${p.distance_from_egerszalok} km • ` : ''}${p.address || ''}</div>
+      </div>
+      <span class="badge ${p.category && p.category.toLowerCase().includes('term') ? 'bg-primary' : 'bg-secondary'}">${p.category || 'Atrakcja'}</span>
+    `;
+
+    item.onclick = () => {
+      document.getElementById("mapContainer").scrollIntoView({ behavior: "smooth", block: "start" });
+      mapInstance.setView([p.lat, p.lng], 16);
+      if (markersMap[p.id]) markersMap[p.id].openPopup();
+    };
+
+    list.appendChild(item);
+  });
+}
+
+// Globalna funkcja otwierająca wysuwany panel (Bottom Sheet)
+window.pokazSzczegolyMiejsca = function(placeId) {
+  const p = allMapPlaces.find(x => x.id === placeId);
+  if (!p) return;
+
+  document.getElementById("sheetPlaceTitle").innerText = p.name;
+  const body = document.getElementById("sheetPlaceBody");
+
+  // Formatowanie JSONB dla godzin i cennika
+  let godzinyTekst = "";
+  if (p.opening_hours) {
+    godzinyTekst = typeof p.opening_hours === 'object' 
+      ? Object.entries(p.opening_hours).map(([k, v]) => `<b>${k}:</b> ${v}`).join('<br>')
+      : p.opening_hours;
+  }
+
+  let cenyTekst = "";
+  if (p.prices) {
+    cenyTekst = typeof p.prices === 'object'
+      ? Object.entries(p.prices).map(([k, v]) => `<b>${k}:</b> ${v}`).join('<br>')
+      : p.prices;
+  }
+
+  body.innerHTML = `
+    ${p.photo ? `<img src="${p.photo}" class="sheet-header-img" alt="${p.name}">` : ''}
+    
+    <div class="mb-3">
+      <span class="badge ${p.category && p.category.toLowerCase().includes('term') ? 'bg-primary' : 'bg-secondary'} mb-1">${p.category || 'Atrakcja'}</span>
+      ${p.address ? `<div class="small text-muted">📍 ${p.address}</div>` : ''}
+      ${p.distance_from_egerszalok ? `<div class="small fw-bold text-dark mt-1">🚗 Odległość z domu: ${p.distance_from_egerszalok} km</div>` : ''}
+    </div>
+
+    ${godzinyTekst ? `
+      <div class="sheet-attr-box">
+        <div class="fw-bold text-dark mb-1">🕒 Godziny otwarcia:</div>
+        <div>${godzinyTekst}</div>
+      </div>
+    ` : ''}
+
+    ${cenyTekst ? `
+      <div class="sheet-attr-box">
+        <div class="fw-bold text-dark mb-1">🎟️ Ceny biletów:</div>
+        <div>${cenyTekst}</div>
+      </div>
+    ` : ''}
+
+    <div class="d-grid gap-2 mt-3">
+      ${p.official_url ? `<a href="${p.official_url}" target="_blank" class="btn btn-outline-danger btn-sm">🌐 Strona oficjalna</a>` : ''}
+      ${p.lat && p.lng ? `<a href="https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}" target="_blank" class="btn btn-burgund btn-sm">🧭 Nawiguj (Google Maps)</a>` : ''}
+    </div>
+  `;
+
+  const sheetEl = document.getElementById("placeDetailsSheet");
+  const bsSheet = new bootstrap.Offcanvas(sheetEl);
+  bsSheet.show();
+};
 
 // ==============================================================================
 // 5. MODUŁ: WYDATKI
