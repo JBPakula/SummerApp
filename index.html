@@ -16,8 +16,31 @@
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   
-  <!-- Custom CSS -->
-  <link rel="stylesheet" href="css/style.css">
+  <!-- Dynamiczny CSS (zawsze najświeższa wersja) -->
+  <script>
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = 'css/style.css?t=' + Date.now();
+    document.head.appendChild(link);
+  </script>
+</head>
+
+  <script>
+  // Automatyczny cache-buster: generuje unikalny czas dla każdego wejścia
+  const v = Date.now();
+  
+  // Wstrzykuje najświeższy CSS
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = 'css/style.css?t=' + v;
+  document.head.appendChild(link);
+
+  // Wstrzykuje najświeższy JS
+  const script = document.createElement('script');
+  script.src = 'js/app.js?t=' + v;
+  script.defer = true;
+  document.head.appendChild(script);
+</script>
 </head>
 <body>
 
@@ -81,13 +104,14 @@
     <main class="container my-2" style="max-width: 500px;">
       
       <!-- 0. PULPIT GŁÓWNY (LANDING PAGE) -->
-      <section id="tab-dashboard" class="app-tab">
+      <section id="tab-dashboard" class="app-tab dashboard-container">
+        <!-- Góra: Logo i powitanie -->
         <div class="text-center my-2">
           <img src="assets/logo.png" alt="Logo" class="img-fluid dashboard-logo mb-1" onerror="this.style.display='none'">
           <h5 class="fw-bold mb-0" style="color: var(--burgund);">Szia, <span id="welcomeUserName">Stado</span>!</h5>
         </div>
 
-        <!-- Siatka Kafelków (Kompaktowe 2 kolumny) -->
+        <!-- Środek: Siatka Kafelków (Kompaktowe 2 kolumny) -->
         <div class="row g-2 mt-1">
           <div class="col-6">
             <div class="card dashboard-card shadow-sm h-100" onclick="switchTab('🗺️ Mapa')">
@@ -153,6 +177,11 @@
               </div>
             </div>
           </div>
+        </div>
+
+        <!-- Dół: Zdjęcie winnicy dopasowujące się do dołu ekranu -->
+        <div class="dashboard-footer-image-wrapper mt-auto">
+          <img src="https://i.wpimg.pl/c/640x480/filerepo.grupawp.pl/api/v1/display/embed/9526bce4-5cc4-4f5f-9925-1813884ed79c" alt="Winnica Eger" class="dashboard-footer-image">
         </div>
       </section>
 
@@ -320,6 +349,11 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="js/app.js"></script>
+<!-- Dynamiczny JS (zawsze najświeższa wersja, ładowany po bibliotekach) -->
+  <script>
+    const script = document.createElement('script');
+    script.src = 'js/app.js?t=' + Date.now();
+    document.body.appendChild(script);
+  </script>
 </body>
 </html>
