@@ -145,7 +145,7 @@ if "ostatnie_lat_lng" not in st.session_state:
 
 # Autologowanie
 if st.session_state.zalogowany_user is None:
-    ciasteczka = cookie_manager.get_all()
+    ciasteczka = cookie_controller.getAll()
     if isinstance(ciasteczka, dict) and "stado_user" in ciasteczka:
         st.session_state.zalogowany_user = ciasteczka["stado_user"]
         st.session_state.user_id = int(ciasteczka.get("stado_uid", 0))
