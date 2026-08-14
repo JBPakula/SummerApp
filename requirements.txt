@@ -1,0 +1,7 @@
+streamlit
+supabase
+extra-streamlit-components
+requests
+folium
+streamlit-folium
+pandas
