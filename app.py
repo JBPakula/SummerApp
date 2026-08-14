@@ -7,10 +7,10 @@ import folium
 from streamlit_folium import st_folium
 import requests
 from supabase import create_client, Client
-from streamlit_cookies_controller import CookieController
+import streamlit.components.v1 as components
 
 # ==============================================================================
-# 1. KONFIGURACJA STRONY (Musi być ZAWSZE pierwszą komendą Streamlit)
+# 1. KONFIGURACJA STRONY (Zawsze pierwsze wywołanie st!)
 # ==============================================================================
 st.set_page_config(
     page_title="Wakacje Stada",
@@ -20,7 +20,7 @@ st.set_page_config(
 )
 
 # ==============================================================================
-# 2. METATAGI (Ikona na telefon) ORAZ STYLE CSS
+# 2. METATAGI (Ikona) ORAZ STYLE CSS
 # ==============================================================================
 st.markdown(
     """
@@ -41,10 +41,12 @@ def wczytaj_style_css():
 wczytaj_style_css()
 
 # ==============================================================================
-# 3. POŁĄCZENIE Z BAZĄ DANYCH (SUPABASE)
+# 3. POŁĄCZENIE Z SUPABASE I SECRETS
 # ==============================================================================
 URL_SUPABASE = st.secrets["SUPABASE_URL"]
 KEY_SUPABASE = st.secrets["SUPABASE_KEY"]
+HASLA = st.secrets["passwords"]
+LICZBA_OSOB_W_EKIPIE = {"Całe Stado": 15, "Bobry": 3, "Pakuły": 4, "Robaki": 4, "Sileziny": 4}
 
 @st.cache_resource
 def inicjalizuj_supabase() -> Client:
@@ -52,63 +54,15 @@ def inicjalizuj_supabase() -> Client:
 
 supabase = inicjalizuj_supabase()
 
-# ==============================================================================
-# 4. MECHANIZM LOGOWANIA I UTRZYMANIA SESJI
-# ==============================================================================
-cookie_controller = CookieController()
-
-# A. Sprawdzenie parametru w linku URL (?uzytkownik=Imie)
-param_user = st.query_params.get("uzytkownik")
-if param_user and "current_user" not in st.session_state:
-    st.session_state["logged_in"] = True
-    st.session_state["current_user"] = param_user
-
-# B. Sprawdzenie zapisanego ciasteczka w przeglądarce
-saved_user = cookie_controller.get("logged_user")
-if saved_user and not st.session_state.get("logged_in", False):
-    st.session_state["logged_in"] = True
-    st.session_state["current_user"] = saved_user
-
-# C. Ekran logowania (jeśli nikt nie jest jeszcze zalogowany)
-if not st.session_state.get("logged_in", False):
-    st.markdown("<h1 style='text-align: center;'>Wakacje Stada</h1>", unsafe_allow_html=True)
-    
-    # Lista użytkowników pobierana dynamicznie lub ze zdefiniowanej listy
-    lista_osob = ["Asia", "Kasia", "Tomek", "Inny użytkownik"]
-    selected_user = st.selectbox("Kim jesteś?", options=lista_osob)
-    
-    # Pole tekstowe (bez type="password", żeby Chrome nie rzucał czerwonym alertem o wycieku haseł)
-    kod_dostepu = st.text_input("Kod dostępu / Hasło:")
-    
-    if st.button("Wejdź do aplikacji"):
-        if kod_dostepu:  # Tutaj następuje weryfikacja poprawności
-            st.session_state["logged_in"] = True
-            st.session_state["current_user"] = selected_user
-            
-            # Zapisanie ciasteczka na 60 dni
-            cookie_controller.set("logged_user", selected_user, max_age=60*24*60*60)
-            
-            # Zapisanie parametru w pasku adresu (pozwala zapisać zakładkę w telefonie)
-            st.query_params["uzytkownik"] = selected_user
-            st.rerun()
-        else:
-            st.warning("Podaj kod dostępu.")
-    
-    st.stop()  # Zatrzymanie renderowania reszty aplikacji przed zalogowaniem
-
-# --- MATRYCE SYSTEMOWE (POBIERANIE Z SECRETS) ---
-HASLA = st.secrets["passwords"]
-
-
-LICZBA_OSOB_W_EKIPIE = {"Całe Stado": 15, "Bobry": 3, "Pakuły": 4, "Robaki": 4, "Sileziny": 4}
-
 @st.cache_data(ttl=600)
 def pobierz_profil_i_malzenstwa_z_bazy():
     malzenstwa_mapa = {}
     ekipy_mapa = {}
     try:
-        try: users_data = supabase.table("users").select("id, login, spouse_id, team").execute().data or []
-        except: users_data = supabase.table("Users").select("id, login, spouse_id, team").execute().data or []
+        try:
+            users_data = supabase.table("users").select("id, login, spouse_id, team").execute().data or []
+        except:
+            users_data = supabase.table("Users").select("id, login, spouse_id, team").execute().data or []
         
         id_to_login = {u["id"]: u["login"] for u in users_data}
         for u in users_data:
@@ -123,7 +77,9 @@ def pobierz_profil_i_malzenstwa_z_bazy():
 
 MALZENSTWA, EKIPY = pobierz_profil_i_malzenstwa_z_bazy()
 
-# --- INICJALIZACJA STANÓW ---
+# ==============================================================================
+# 4. INICJALIZACJA STANÓW SESJI
+# ==============================================================================
 if "zalogowany_user" not in st.session_state:
     st.session_state.zalogowany_user = None
 if "user_id" not in st.session_state:
@@ -144,43 +100,39 @@ if "ostatnie_lat_lng" not in st.session_state:
     st.session_state.ostatnie_lat_lng = None
 
 # ==============================================================================
-# AUTOLOGOWANIE (Parametry URL / Token)
+# 5. AUTOLOGOWANIE (URL QUERY PARAMS + LOCALSTORAGE)
 # ==============================================================================
-if st.session_state.get("zalogowany_user") is None:
-    param_user = st.query_params.get("user")
-    param_token = st.query_params.get("token")
-    
+param_user = st.query_params.get("user") or st.query_params.get("uzytkownik")
+param_token = st.query_params.get("token") or st.query_params.get("haslo")
+
+# Skrypt JS synchronizujący dane z localStorage przeglądarki
+js_code = f"""
+<script>
+    const paramUser = "{param_user if param_user else ''}";
+    const paramToken = "{param_token if param_token else ''}";
+
+    if (paramUser && paramToken) {{
+        localStorage.setItem("stado_user", paramUser);
+        localStorage.setItem("stado_token", paramToken);
+    }}
+
+    const savedUser = localStorage.getItem("stado_user");
+    const savedToken = localStorage.getItem("stado_token");
+
+    if (savedUser && savedToken && (!paramUser || !paramToken)) {{
+        const currentUrl = new URL(window.parent.location.href);
+        currentUrl.searchParams.set("user", savedUser);
+        currentUrl.searchParams.set("token", savedToken);
+        window.parent.location.href = currentUrl.toString();
+    }}
+</script>
+"""
+components.html(js_code, height=0, width=0)
+
+# Weryfikacja parametrów logowania
+if st.session_state.zalogowany_user is None:
     if param_user and param_token:
-        # Weryfikacja czy token z linku zgadza się z hasłem użytkownika
         oczekiwane_haslo = str(HASLA.get(param_user, "")).strip()
-        if oczekiwane_haslo and param_token.strip() == oczekiwane_haslo:
-            try:
-                res = (
-                    supabase.table("users")
-                    .select("id, login")
-                    .ilike("login", param_user)
-                    .execute()
-                )
-                if res.data and len(res.data) > 0:
-                    st.session_state.user_id = res.data[0]["id"]
-                    st.session_state.zalogowany_user = param_user
-            except Exception:
-                pass
-
-
-# ==============================================================================
-# AUTOLOGOWANIE Z LINKU (Parametry URL / Token)
-# ==============================================================================
-if st.session_state.get("zalogowany_user") is None:
-    # Pobieramy parametry niezależnie od wielkości liter
-    params = st.query_params
-    param_user = params.get("user") or params.get("uzytkownik")
-    param_token = params.get("token") or params.get("haslo")
-
-    if param_user and param_token:
-        # Porównanie bez względu na białe znaki
-        oczekiwane_haslo = str(HASLA.get(param_user, "")).strip()
-        
         if oczekiwane_haslo and param_token.strip() == oczekiwane_haslo:
             try:
                 res = (
@@ -192,16 +144,14 @@ if st.session_state.get("zalogowany_user") is None:
                 if res.data and len(res.data) > 0:
                     st.session_state.user_id = res.data[0]["id"]
                     st.session_state.zalogowany_user = res.data[0]["login"]
-                    # Kluczowe: wymuszamy natychmiastowe przejście do aplikacji
                     st.rerun()
             except Exception:
                 pass
 
-
 # ==============================================================================
-# FORMULARZ LOGOWANIA (Gdy brak aktywnej sesji)
+# 6. EKRAN LOGOWANIA (Gdy użytkownik nie jest zalogowany)
 # ==============================================================================
-if st.session_state.get("zalogowany_user") is None:
+if st.session_state.zalogowany_user is None:
     st.markdown(
         """
         <div style='margin-top: 40px;'>
@@ -214,9 +164,7 @@ if st.session_state.get("zalogowany_user") is None:
     with st.form("logowanie_form"):
         wybrane_imie = st.selectbox("Kim jesteś?", list(HASLA.keys()))
         wpisane_haslo = st.text_input("Hasło:", key="pole_haslo")
-        przycisk_zaloguj = st.form_submit_button(
-            "Wejdź do aplikacji", use_container_width=True
-        )
+        przycisk_zaloguj = st.form_submit_button("Wejdź do aplikacji", use_container_width=True)
 
         if przycisk_zaloguj:
             prawidlowe_haslo = str(HASLA.get(wybrane_imie, "")).strip()
@@ -237,28 +185,22 @@ if st.session_state.get("zalogowany_user") is None:
                         st.session_state.user_id = uid
                         st.session_state.zalogowany_user = wybrane_imie
 
-                        # Zapisujemy token do paska adresu URL – działa na stałe
                         st.query_params["user"] = wybrane_imie
                         st.query_params["token"] = prawidlowe_haslo
-
-                        st.success(f"Witaj {wybrane_imie}! Logowanie...")
                         st.rerun()
                     else:
-                        st.error(
-                            f"❌ Nie znaleziono użytkownika '{wybrane_imie}' w tabeli 'users' w bazie!"
-                        )
+                        st.error(f"❌ Nie znaleziono użytkownika '{wybrane_imie}' w tabeli 'users' w bazie!")
                 except Exception as e:
                     st.error(f"❌ Błąd połączenia z bazą: {e}")
 
     st.stop()
 
 # ==============================================================================
-# INICJALIZACJA DANYCH ZALOGOWANEGO UŻYTKOWNIKA
+# 7. INICJALIZACJA DANYCH ZALOGOWANEGO UŻYTKOWNIKA I SIDEBAR
 # ==============================================================================
 user_aktualny = st.session_state.zalogowany_user
 id_aktualny = st.session_state.user_id
 team_aktualny = EKIPY.get(user_aktualny, "Pakuły")
-
 
 def pobierz_avatar_src(login):
     """Zwraca lokalne zdjęcie zakodowane w base64 lub fallback SVG."""
@@ -273,14 +215,8 @@ def pobierz_avatar_src(login):
 
     return f"https://api.dicebear.com/7.x/initials/svg?seed={login}"
 
-
 avatar_url = pobierz_avatar_src(user_aktualny)
 
-
-# Pobieramy zakodowane zdjęcie aktualnego użytkownika
-avatar_url = pobierz_avatar_src(user_aktualny)
-
-# --- LEWY PANEL BOCZNY (SIDEBAR) ---
 st.sidebar.markdown(f"""
     <div class="sidebar-profile-card">
         <img src="{avatar_url}">
