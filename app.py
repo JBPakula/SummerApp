@@ -8,6 +8,35 @@ from streamlit_folium import st_folium
 import requests
 from supabase import create_client, Client
 import extra_streamlit_components as stx
+from streamlit_cookies_controller import CookieController
+
+# Inicjalizacja kontrolera ciasteczek
+cookie_controller = CookieController()
+
+# 1. Automatyczne przywrócenie sesji z ciasteczka (jeśli istnieje)
+saved_user = cookie_controller.get("logged_user")
+if saved_user and "current_user" not in st.session_state:
+    st.session_state["logged_in"] = True
+    st.session_state["current_user"] = saved_user
+
+# 2. Jeśli użytkownik nie jest zalogowany – pokazujemy formularz
+if not st.session_state.get("logged_in", False):
+    st.markdown("### Wakacje Stada")
+    
+    selected_user = st.selectbox("Kim jesteś?", options=["Asia", "Kasia", "Inny użytkownik"])  # Twoja lista użytkowników
+    password = st.text_input("Hasło:", type="password")
+    
+    if st.button("Wejdź do aplikacji"):
+        # Tutaj następuje weryfikacja Twojego hasła (np. z Supabase / secrets)
+        # Gdy hasło się zgadza:
+        st.session_state["logged_in"] = True
+        st.session_state["current_user"] = selected_user
+        
+        # Zapisujemy ciasteczko w przeglądarce na 30 dni
+        cookie_controller.set("logged_user", selected_user, max_age=30*24*60*60)
+        st.rerun()
+    
+    st.stop()  # Zatrzymuje dalsze renderowanie aplikacji przed zalogowaniem
 
 
 # --- 1. KONFIGURACJA STRONY (Zawsze pierwsze wywołanie st!) ---

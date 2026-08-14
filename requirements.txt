@@ -5,3 +5,4 @@ requests
 folium
 streamlit-folium
 pandas
+streamlit-cookies-controller
