@@ -264,3 +264,21 @@ html, body {
     display: block;
     box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
 }
+
+/* --- KOLOROWE PINEZKI DLA MAPY --- */
+.custom-pin {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: white;
+  font-weight: bold;
+  font-size: 11px;
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+}
+
+.pin-termy { background-color: #0284c7; }      /* Niebieski */
+.pin-zwiedzanie { background-color: #b45309; } /* Ciepły bursztyn / brąz */
+.pin-inne { background-color: #4b5563; }       /* Szary grafit */
+.pin-dom { background-color: #8B0000; }        /* Burgund dom */

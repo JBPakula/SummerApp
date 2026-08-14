@@ -24,12 +24,19 @@ let ekipyMapa = {};
 // ==============================================================================
 // 2. INICJALIZACJA I OBSŁUGA SESJI (LOCALSTORAGE & BAZA)
 // ==============================================================================
-document.addEventListener("DOMContentLoaded", async () => {
+async function initApp() {
   await pobierzKursyWalut();
   await pobierzUzytkownikowIMalzenstwa();
   await checkAuth();
   setupEventListeners();
-});
+}
+
+// Bezpieczny start: odpala od razu, jeśli DOM jest już gotowy
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initApp);
+} else {
+  initApp();
+}
 
 async function pobierzKursyWalut() {
   try {
@@ -156,7 +163,8 @@ async function verifyAndLogin(userName, password) {
     avatarEl.onerror = tryLoadAvatar;
     tryLoadAvatar();
 
-    renderNavigation();
+renderNavigation();
+    switchTab('dashboard'); // Aktywuje widok kafelków i pulpitu
     initMap();
     loadCosts();
     return true;
@@ -267,17 +275,47 @@ function switchTab(tabName) {
 // ==============================================================================
 // 4. MODUŁ: MAPA
 // ==============================================================================
+let domMarker = null;
+const markersMap = {};
+
+function getCategoryPinIcon(category, number) {
+  let pinClass = 'pin-inne';
+  const cat = (category || '').toLowerCase();
+  
+  if (cat.includes('term')) {
+    pinClass = 'pin-termy';
+  } else if (cat.includes('zwiedzanie') || cat.includes('zabytek') || cat.includes('atrakcj')) {
+    pinClass = 'pin-zwiedzanie';
+  }
+
+  return L.divIcon({
+    className: 'custom-pin-wrapper',
+    html: `<div class="custom-pin ${pinClass}" style="width: 28px; height: 28px;">#${number}</div>`,
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+    popupAnchor: [0, -14]
+  });
+}
+
 function initMap() {
   if (mapInstance) return;
-  mapInstance = L.map('mapContainer').setView([DOM_LAT, DOM_LNG], 12);
+  
+  mapInstance = L.map('mapContainer').setView([DOM_LAT, DOM_LNG], 15);
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap'
   }).addTo(mapInstance);
 
-  L.marker([DOM_LAT, DOM_LNG]).addTo(mapInstance)
-    .bindPopup('<b>🏠 Ámbitus ház</b><br>Sáfrány út 38/a, Egerszalók')
-    .openPopup();
+  const homeIcon = L.divIcon({
+    className: 'custom-pin-wrapper',
+    html: `<div class="custom-pin pin-dom" style="width: 32px; height: 32px; font-size: 15px;">🏠</div>`,
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
+    popupAnchor: [0, -16]
+  });
+
+  domMarker = L.marker([DOM_LAT, DOM_LNG], { icon: homeIcon }).addTo(mapInstance)
+    .bindPopup('<b>🏠 Ámbitus ház (Dom)</b><br><small class="text-muted">Sáfrány út 38/a, Egerszalók</small>');
 
   loadMapPlaces();
 }
@@ -288,14 +326,41 @@ async function loadMapPlaces() {
   list.innerHTML = "";
 
   if (data) {
-    data.forEach(p => {
+    data.forEach((p, index) => {
       if (p.lat && p.lng) {
-        L.marker([p.lat, p.lng]).addTo(mapInstance).bindPopup(`<b>#${p.id} ${p.name}</b><br>${p.address || ''}`);
-        
+        const pinNumber = index + 1;
+        const icon = getCategoryPinIcon(p.category, pinNumber);
+
+        const marker = L.marker([p.lat, p.lng], { icon: icon }).addTo(mapInstance);
+        marker.bindPopup(`
+          <div style="min-width: 160px;">
+            <b style="color: var(--burgund);">#${pinNumber} ${p.name}</b>
+            ${p.address ? `<div class="small text-muted mt-1">📍 ${p.address}</div>` : ''}
+            <div class="badge bg-secondary mt-1">${p.category || 'Atrakcja'}</div>
+          </div>
+        `);
+
+        markersMap[p.id] = marker;
+
         const item = document.createElement("button");
-        item.className = "list-group-item list-group-item-action small";
-        item.innerText = `🌐 #${p.id} - ${p.name} (${p.category})`;
-        item.onclick = () => { mapInstance.setView([p.lat, p.lng], 15); };
+        item.className = "list-group-item list-group-item-action d-flex justify-content-between align-items-center py-2";
+        item.innerHTML = `
+          <div>
+            <b>#${pinNumber}</b> ${p.name}
+            ${p.address ? `<div class="small text-muted">${p.address}</div>` : ''}
+          </div>
+          <span class="badge ${p.category && p.category.toLowerCase().includes('term') ? 'bg-primary' : 'bg-secondary'}">${p.category || ''}</span>
+        `;
+
+        item.onclick = () => {
+          // 1. Płynne przewinięcie ekranu do samej mapy
+          document.getElementById("mapContainer").scrollIntoView({ behavior: "smooth", block: "start" });
+          
+          // 2. Wycentrowanie mapy na punkcie z dużym zbliżeniem i otwarcie etykiety
+          mapInstance.setView([p.lat, p.lng], 16);
+          marker.openPopup();
+        };
+
         list.appendChild(item);
       }
     });
@@ -545,23 +610,16 @@ document.getElementById("btnSendForum").onclick = async () => {
 // 9. EVENT LISTENERS
 // ==============================================================================
 function setupEventListeners() {
-  document.getElementById("btnModePrep").onclick = () => {
-    currentMode = "Przygotowanie";
-    document.getElementById("btnModePrep").className = "btn btn-burgund";
-    document.getElementById("btnModeTrip").className = "btn btn-outline-danger";
-    renderNavigation();
-  };
-
-  document.getElementById("btnModeTrip").onclick = () => {
-    currentMode = "Na wyjeździe";
-    document.getElementById("btnModeTrip").className = "btn btn-burgund";
-    document.getElementById("btnModePrep").className = "btn btn-outline-danger";
-    renderNavigation();
-  };
-
-  document.getElementById("btnCenterHome").onclick = () => {
-    if (mapInstance) mapInstance.setView([DOM_LAT, DOM_LNG], 12);
-  };
+  const btnHome = document.getElementById("btnCenterHome");
+  if (btnHome) {
+    btnHome.onclick = () => {
+      if (mapInstance) {
+        document.getElementById("mapContainer").scrollIntoView({ behavior: "smooth", block: "start" });
+        mapInstance.setView([DOM_LAT, DOM_LNG], 16);
+        if (domMarker) domMarker.openPopup();
+      }
+    };
+  }
 
   ["calcNormal", "calcReduced", "calcCurrency"].forEach(id => {
     const el = document.getElementById(id);

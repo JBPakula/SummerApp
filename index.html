@@ -1,5 +1,7 @@
 <!DOCTYPE html>
 <html lang="pl">
+<!DOCTYPE html>
+<html lang="pl">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -24,7 +26,7 @@
     document.head.appendChild(link);
   </script>
 </head>
-
+<body>
   <script>
   // Automatyczny cache-buster: generuje unikalny czas dla każdego wejścia
   const v = Date.now();
@@ -185,16 +187,12 @@
         </div>
       </section>
 
-      <!-- 1. Zakładka: Mapa -->
-      <section id="tab-map" class="app-tab" style="display: none;">
-        <div class="d-flex align-items-center justify-content-between mb-3">
-          <h4 class="fw-bold mb-0">🗺️ Wakacyjne Punkty</h4>
-          <button class="btn btn-sm btn-outline-secondary" onclick="switchTab('dashboard')"><i class="bi bi-arrow-left"></i> Wróć</button>
-        </div>
+<!-- Zakładka 1: Mapa -->
+      <section id="tab-map" class="app-tab">
         <div id="mapContainer" style="height: 380px; width: 100%; border-radius: 14px;" class="shadow-sm mb-3"></div>
         <button id="btnCenterHome" class="btn btn-outline-dark btn-sm w-100 mb-3">🏠 Centruj na: Ámbitus ház (Dom)</button>
-        <h6 class="fw-bold">📌 Spis atrakcji:</h6>
-        <div id="placesList" class="list-group"></div>
+        <h6 class="fw-bold mb-2">📌 Spis atrakcji:</h6>
+        <div id="placesList" class="list-group shadow-sm rounded-3 mb-4"></div>
       </section>
 
       <!-- 2. Zakładka: Wydatki -->
