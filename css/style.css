@@ -134,27 +134,47 @@ body {
     color: #2D2D2D;
 }
 
-/* Tło pejzażu z płynnym przejściem od bieli do winnicy na dole */
+/* Kontener pulpitu */
 #tab-dashboard {
-    min-height: calc(100vh - 120px);
+    position: relative;
+    min-height: calc(100vh - 110px);
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
+    background-color: #FFFFFF;
+    border-radius: 16px;
+    padding-bottom: 20px;
+    overflow: hidden;
+}
+
+/* Zawartość pulpitu (logo + kafelki) zawsze na wierzchu i klikalna */
+#tab-dashboard > * {
+    position: relative;
+    z-index: 2;
+}
+
+/* Warstwa pejzażu na dole z idealnym, miękkim rozmyciem nieba */
+#tab-dashboard::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 280px; /* Wysokość strefy pejzażu */
     background-image: 
         linear-gradient(
             to bottom,
             #FFFFFF 0%,
-            #FFFFFF 28%,
-            rgba(255, 255, 255, 0.85) 50%,
-            rgba(255, 255, 255, 0.2) 75%,
-            rgba(255, 255, 255, 0) 100%
+            rgba(255, 255, 255, 0.85) 15%,
+            rgba(255, 255, 255, 0.3) 35%,
+            rgba(255, 255, 255, 0) 60%
         ),
         url('../assets/landscape.webp');
-    background-size: cover;
-    background-position: center bottom;
-    background-repeat: no-repeat;
-    border-radius: 16px;
-    padding-bottom: 30px;
+    background-size: 100% 100%, 100% auto;
+    background-position: center top, center bottom;
+    background-repeat: no-repeat, no-repeat;
+    z-index: 1;
+    pointer-events: none;
 }
 
 .dashboard-logo {

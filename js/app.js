@@ -132,6 +132,10 @@ async function verifyAndLogin(userName, password) {
     document.getElementById("appSection").style.display = "block";
     document.getElementById("userNameDisplay").innerText = currentUser + " 👋";
     document.getElementById("userTeamDisplay").innerText = currentTeam;
+    const welcomeEl = document.getElementById("welcomeUserName");
+    if (welcomeEl) {
+      welcomeEl.innerText = currentUser;
+    }
 
     // Inteligentne ładowanie awatara (obsługa .jpg, .jpeg, .png oraz fallback)
     const avatarEl = document.getElementById("userAvatar");
