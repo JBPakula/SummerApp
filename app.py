@@ -143,22 +143,40 @@ if "pokaz_formularz_mapy" not in st.session_state:
 if "ostatnie_lat_lng" not in st.session_state:
     st.session_state.ostatnie_lat_lng = None
 
-# Autologowanie
-if st.session_state.zalogowany_user is None:
-    ciasteczka = cookie_controller.getAll()
-    if isinstance(ciasteczka, dict) and "stado_user" in ciasteczka:
-        st.session_state.zalogowany_user = ciasteczka["stado_user"]
-        st.session_state.user_id = int(ciasteczka.get("stado_uid", 0))
-        st.rerun()
+# ==============================================================================
+# AUTOLOGOWANIE (Parametry URL / Token)
+# ==============================================================================
+if st.session_state.get("zalogowany_user") is None:
+    param_user = st.query_params.get("user")
+    param_token = st.query_params.get("token")
+    
+    if param_user and param_token:
+        # Weryfikacja czy token z linku zgadza się z hasłem użytkownika
+        oczekiwane_haslo = str(HASLA.get(param_user, "")).strip()
+        if oczekiwane_haslo and param_token.strip() == oczekiwane_haslo:
+            try:
+                res = (
+                    supabase.table("users")
+                    .select("id, login")
+                    .ilike("login", param_user)
+                    .execute()
+                )
+                if res.data and len(res.data) > 0:
+                    st.session_state.user_id = res.data[0]["id"]
+                    st.session_state.zalogowany_user = param_user
+            except Exception:
+                pass
 
-# LOGOWANIE
-if st.session_state.zalogowany_user is None:
+# ==============================================================================
+# FORMULARZ LOGOWANIA (Gdy brak aktywnej sesji)
+# ==============================================================================
+if st.session_state.get("zalogowany_user") is None:
     st.markdown(
         """
         <div style='margin-top: 40px;'>
             <h1 class="login-header-title">Wakacje Stada</h1>
         </div>
-    """,
+        """,
         unsafe_allow_html=True,
     )
 
@@ -188,25 +206,9 @@ if st.session_state.zalogowany_user is None:
                         st.session_state.user_id = uid
                         st.session_state.zalogowany_user = wybrane_imie
 
-                        # Zapis ciasteczek z obsługą strefy czasowej UTC
-                        expires_date = datetime(
-                            2026, 8, 31, 23, 59, 59, tzinfo=timezone.utc
-                        )
-                        try:
-                            cookie_manager.set(
-                                "stado_user",
-                                wybrane_imie,
-                                expires_at=expires_date,
-                                key="set_user",
-                            )
-                            cookie_manager.set(
-                                "stado_uid",
-                                str(uid),
-                                expires_at=expires_date,
-                                key="set_uid",
-                            )
-                        except Exception:
-                            pass
+                        # Zapisujemy token do paska adresu URL – działa na stałe
+                        st.query_params["user"] = wybrane_imie
+                        st.query_params["token"] = prawidlowe_haslo
 
                         st.success(f"Witaj {wybrane_imie}! Logowanie...")
                         st.rerun()
@@ -218,7 +220,10 @@ if st.session_state.zalogowany_user is None:
                     st.error(f"❌ Błąd połączenia z bazą: {e}")
 
     st.stop()
-    
+
+# ==============================================================================
+# INICJALIZACJA DANYCH ZALOGOWANEGO UŻYTKOWNIKA
+# ==============================================================================
 user_aktualny = st.session_state.zalogowany_user
 id_aktualny = st.session_state.user_id
 team_aktualny = EKIPY.get(user_aktualny, "Pakuły")
@@ -236,6 +241,9 @@ def pobierz_avatar_src(login):
             return f"data:{mime};base64,{b64_data}"
 
     return f"https://api.dicebear.com/7.x/initials/svg?seed={login}"
+
+
+avatar_url = pobierz_avatar_src(user_aktualny)
 
 
 # Pobieramy zakodowane zdjęcie aktualnego użytkownika
