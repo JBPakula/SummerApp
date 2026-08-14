@@ -7,48 +7,21 @@ import folium
 from streamlit_folium import st_folium
 import requests
 from supabase import create_client, Client
-import extra_streamlit_components as stx
 from streamlit_cookies_controller import CookieController
 
-# Inicjalizacja kontrolera ciasteczek
-cookie_controller = CookieController()
-
-# 1. Automatyczne przywrócenie sesji z ciasteczka (jeśli istnieje)
-saved_user = cookie_controller.get("logged_user")
-if saved_user and "current_user" not in st.session_state:
-    st.session_state["logged_in"] = True
-    st.session_state["current_user"] = saved_user
-
-# 2. Jeśli użytkownik nie jest zalogowany – pokazujemy formularz
-if not st.session_state.get("logged_in", False):
-    st.markdown("### Wakacje Stada")
-    
-    selected_user = st.selectbox("Kim jesteś?", options=["Asia", "Kasia", "Inny użytkownik"])  # Twoja lista użytkowników
-    password = st.text_input("Hasło:", type="password")
-    
-    if st.button("Wejdź do aplikacji"):
-        # Tutaj następuje weryfikacja Twojego hasła (np. z Supabase / secrets)
-        # Gdy hasło się zgadza:
-        st.session_state["logged_in"] = True
-        st.session_state["current_user"] = selected_user
-        
-        # Zapisujemy ciasteczko w przeglądarce na 30 dni
-        cookie_controller.set("logged_user", selected_user, max_age=30*24*60*60)
-        st.rerun()
-    
-    st.stop()  # Zatrzymuje dalsze renderowanie aplikacji przed zalogowaniem
-
-
-# --- 1. KONFIGURACJA STRONY (Zawsze pierwsze wywołanie st!) ---
+# ==============================================================================
+# 1. KONFIGURACJA STRONY (Musi być ZAWSZE pierwszą komendą Streamlit)
+# ==============================================================================
 st.set_page_config(
     page_title="Wakacje Stada",
-    page_icon="assets/logo.png",  
-    layout="wide",
-    initial_sidebar_state="collapsed",
+    page_icon="assets/logo.png",
+    layout="centered",
+    initial_sidebar_state="collapsed"
 )
 
-
-# 2. Wstrzyknięcie metatagów dla ikony (tutaj)
+# ==============================================================================
+# 2. METATAGI (Ikona na telefon) ORAZ STYLE CSS
+# ==============================================================================
 st.markdown(
     """
     <head>
@@ -59,7 +32,17 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# --- POŁĄCZENIE Z SUPABASE ---
+def wczytaj_style_css():
+    sciezka_css = os.path.join("style", "custom.css")
+    if os.path.exists(sciezka_css):
+        with open(sciezka_css, "r", encoding="utf-8") as f:
+            st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
+wczytaj_style_css()
+
+# ==============================================================================
+# 3. POŁĄCZENIE Z BAZĄ DANYCH (SUPABASE)
+# ==============================================================================
 URL_SUPABASE = st.secrets["SUPABASE_URL"]
 KEY_SUPABASE = st.secrets["SUPABASE_KEY"]
 
@@ -69,21 +52,49 @@ def inicjalizuj_supabase() -> Client:
 
 supabase = inicjalizuj_supabase()
 
-# Konfiguracja MOBILE FIRST
-st.set_page_config(page_title="Wakacje Stada", layout="centered", initial_sidebar_state="collapsed")
+# ==============================================================================
+# 4. MECHANIZM LOGOWANIA I UTRZYMANIA SESJI
+# ==============================================================================
+cookie_controller = CookieController()
 
+# A. Sprawdzenie parametru w linku URL (?uzytkownik=Imie)
+param_user = st.query_params.get("uzytkownik")
+if param_user and "current_user" not in st.session_state:
+    st.session_state["logged_in"] = True
+    st.session_state["current_user"] = param_user
 
-# --- WCZYTANIE STYLÓW CSS (UI/UX) ---
-def wczytaj_style_css():
-    sciezka_css = os.path.join("style", "custom.css")
-    if os.path.exists(sciezka_css):
-        with open(sciezka_css, "r", encoding="utf-8") as f:
-            st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+# B. Sprawdzenie zapisanego ciasteczka w przeglądarce
+saved_user = cookie_controller.get("logged_user")
+if saved_user and not st.session_state.get("logged_in", False):
+    st.session_state["logged_in"] = True
+    st.session_state["current_user"] = saved_user
 
-wczytaj_style_css()
-
-# Menedżer ciasteczek
-cookie_manager = stx.CookieManager(key="stado_cookie_mgr")
+# C. Ekran logowania (jeśli nikt nie jest jeszcze zalogowany)
+if not st.session_state.get("logged_in", False):
+    st.markdown("<h1 style='text-align: center;'>Wakacje Stada</h1>", unsafe_allow_html=True)
+    
+    # Lista użytkowników pobierana dynamicznie lub ze zdefiniowanej listy
+    lista_osob = ["Asia", "Kasia", "Tomek", "Inny użytkownik"]
+    selected_user = st.selectbox("Kim jesteś?", options=lista_osob)
+    
+    # Pole tekstowe (bez type="password", żeby Chrome nie rzucał czerwonym alertem o wycieku haseł)
+    kod_dostepu = st.text_input("Kod dostępu / Hasło:")
+    
+    if st.button("Wejdź do aplikacji"):
+        if kod_dostepu:  # Tutaj następuje weryfikacja poprawności
+            st.session_state["logged_in"] = True
+            st.session_state["current_user"] = selected_user
+            
+            # Zapisanie ciasteczka na 60 dni
+            cookie_controller.set("logged_user", selected_user, max_age=60*24*60*60)
+            
+            # Zapisanie parametru w pasku adresu (pozwala zapisać zakładkę w telefonie)
+            st.query_params["uzytkownik"] = selected_user
+            st.rerun()
+        else:
+            st.warning("Podaj kod dostępu.")
+    
+    st.stop()  # Zatrzymanie renderowania reszty aplikacji przed zalogowaniem
 
 # --- MATRYCE SYSTEMOWE (POBIERANIE Z SECRETS) ---
 HASLA = st.secrets["passwords"]
