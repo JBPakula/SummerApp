@@ -167,6 +167,37 @@ if st.session_state.get("zalogowany_user") is None:
             except Exception:
                 pass
 
+
+# ==============================================================================
+# AUTOLOGOWANIE Z LINKU (Parametry URL / Token)
+# ==============================================================================
+if st.session_state.get("zalogowany_user") is None:
+    # Pobieramy parametry niezależnie od wielkości liter
+    params = st.query_params
+    param_user = params.get("user") or params.get("uzytkownik")
+    param_token = params.get("token") or params.get("haslo")
+
+    if param_user and param_token:
+        # Porównanie bez względu na białe znaki
+        oczekiwane_haslo = str(HASLA.get(param_user, "")).strip()
+        
+        if oczekiwane_haslo and param_token.strip() == oczekiwane_haslo:
+            try:
+                res = (
+                    supabase.table("users")
+                    .select("id, login")
+                    .ilike("login", param_user.strip())
+                    .execute()
+                )
+                if res.data and len(res.data) > 0:
+                    st.session_state.user_id = res.data[0]["id"]
+                    st.session_state.zalogowany_user = res.data[0]["login"]
+                    # Kluczowe: wymuszamy natychmiastowe przejście do aplikacji
+                    st.rerun()
+            except Exception:
+                pass
+
+
 # ==============================================================================
 # FORMULARZ LOGOWANIA (Gdy brak aktywnej sesji)
 # ==============================================================================
