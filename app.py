@@ -18,6 +18,18 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
+
+# 2. Wstrzyknięcie metatagów dla ikony (tutaj)
+st.markdown(
+    """
+    <head>
+        <link rel="apple-touch-icon" href="assets/logo.png">
+        <link rel="icon" type="image/png" sizes="192x192" href="assets/logo.png">
+    </head>
+    """,
+    unsafe_allow_html=True
+)
+
 # --- POŁĄCZENIE Z SUPABASE ---
 URL_SUPABASE = st.secrets["SUPABASE_URL"]
 KEY_SUPABASE = st.secrets["SUPABASE_KEY"]
