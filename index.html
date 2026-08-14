@@ -8,44 +8,215 @@
   <!-- Manifest PWA -->
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#8B0000">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Wakacje Stada">
   
-  <!-- Ikony -->
-  <link rel="icon" type="image/png" href="assets/logo.png">
-  <link rel="apple-touch-icon" href="assets/logo.png">
-
-  <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background-color: #ffffff;
-    }
-    iframe {
-      width: 100%;
-      height: 100%;
-      border: none;
-      display: block;
-    }
-  </style>
+  <!-- Bootstrap 5 CSS & Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <iframe id="appFrame" src="" allow="geolocation; camera; microphone"></iframe>
 
-  <script>
-    // Bazowy adres Twojej aplikacji Streamlit
-    const baseStreamlitUrl = "https://wakacje-stada.streamlit.app/";
-    
-    // Przekazanie parametrów (np. ?user=Asia&token=...) z paska adresu do Streamlita
-    const currentParams = window.location.search;
-    const targetUrl = baseStreamlitUrl + currentParams;
-    
-    document.getElementById("appFrame").src = targetUrl;
-  </script>
+  <!-- EKRAN LOGOWANIA (Pokazuje się, gdy brak sesji) -->
+  <div id="loginSection" class="container py-5" style="display: none; max-width: 420px;">
+    <div class="card shadow-lg p-4 border-0 rounded-4 mt-4">
+      <h2 class="text-center fw-bold mb-4" style="color: var(--burgund);">Wakacje Stada</h2>
+    <div class="mb-3">
+        <label class="form-label fw-bold">Kim jesteś?</label>
+        <input type="text" id="loginUsernameInput" class="form-control" list="userSuggestions" placeholder="Wpisz lub wybierz imię" autocomplete="off">
+        <datalist id="userSuggestions"></datalist>
+    </div>
+      <div class="mb-3">
+        <label class="form-label fw-bold">Hasło:</label>
+        <input type="password" id="loginPasswordInput" class="form-control" placeholder="Wpisz hasło">
+      </div>
+      <button id="btnLogin" class="btn btn-burgund w-100 py-2 mt-2">Wejdź do aplikacji</button>
+      <div id="loginError" class="alert alert-danger mt-3 py-2 text-center" style="display: none;"></div>
+    </div>
+  </div>
+
+  <!-- GŁÓWNY WIDOK APLIKACJI -->
+  <div id="appSection" style="display: none;">
+    <!-- Górny Pasek Nawigacyjny -->
+    <nav class="navbar navbar-light bg-light shadow-sm sticky-top px-3">
+      <button class="btn btn-outline-secondary" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebarMenu">
+        <i class="bi bi-list fs-5"></i>
+      </button>
+      <span class="navbar-brand mb-0 h1 fw-bold" style="color: var(--burgund);">Wakacje Stada</span>
+      <div class="btn-group btn-group-sm" role="group">
+        <button id="btnModePrep" class="btn btn-outline-danger">⛺ Przygotowanie</button>
+        <button id="btnModeTrip" class="btn btn-burgund">🍇 Na wyjeździe</button>
+      </div>
+    </nav>
+
+    <!-- Menu Boczne (Offcanvas / Sidebar) -->
+    <div class="offcanvas offcanvas-start" tabindex="-1" id="sidebarMenu">
+      <div class="offcanvas-header border-bottom">
+        <h5 class="offcanvas-title fw-bold" style="color: var(--burgund);">Menu Główne</h5>
+        <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas"></button>
+      </div>
+      <div class="offcanvas-body">
+        <div class="profile-card">
+          <img id="userAvatar" src="" class="profile-avatar" alt="Avatar">
+          <h5 id="userNameDisplay" class="fw-bold mb-0">Użytkownik</h5>
+          <small class="text-muted">Team: <b id="userTeamDisplay" style="color: var(--burgund);">Ekipa</b></small>
+        </div>
+        <div class="d-grid gap-2" id="navButtonsContainer">
+          <!-- Przyciski nawigacji generowane dynamicznie -->
+        </div>
+        <hr>
+        <button id="btnLogout" class="btn btn-outline-secondary w-100"><i class="bi bi-box-arrow-right"></i> Wyloguj się</button>
+      </div>
+    </div>
+
+    <!-- Kontener Zakładek -->
+    <main class="container my-3">
+      <!-- Zakładka 1: Mapa -->
+      <section id="tab-map" class="app-tab">
+        <h4 class="fw-bold mb-3">🗺️ Wakacyjne Punkty</h4>
+        <div id="mapContainer" style="height: 380px; width: 100%; border-radius: 14px;" class="shadow-sm mb-3"></div>
+        <button id="btnCenterHome" class="btn btn-outline-dark btn-sm w-100 mb-3">🏠 Centruj na: Ámbitus ház (Dom)</button>
+        <h6 class="fw-bold">📌 Spis atrakcji:</h6>
+        <div id="placesList" class="list-group"></div>
+      </section>
+
+      <!-- Zakładka 2: Wydatki -->
+      <section id="tab-costs" class="app-tab" style="display: none;">
+        <h4 class="fw-bold mb-3">💰 Wydatki Stada</h4>
+        <div class="card p-3 border-0 shadow-sm rounded-4 mb-4">
+          <h6 class="fw-bold" style="color: var(--burgund);">➕ Dodaj nowy wydatek</h6>
+          <form id="formCost">
+            <div class="mb-2"><input type="text" id="costName" class="form-control form-control-sm" placeholder="Za co?" required></div>
+            <div class="row g-2 mb-2">
+              <div class="col-7"><input type="number" id="costAmount" step="0.01" class="form-control form-control-sm" placeholder="Kwota" required></div>
+              <div class="col-5">
+                <select id="costCurrency" class="form-select form-select-sm">
+                  <option value="HUF">HUF</option><option value="PLN">PLN</option><option value="EUR">EUR</option>
+                </select>
+              </div>
+            </div>
+            <div class="mb-2">
+              <select id="costBorrower" class="form-select form-select-sm">
+                <option value="Całe Stado">Całe Stado</option><option value="Bobry">Bobry</option><option value="Sileziny">Sileziny</option><option value="Robaki">Robaki</option><option value="Pakuły">Pakuły</option>
+              </select>
+            </div>
+            <div class="mb-2"><input type="text" id="costComment" class="form-control form-control-sm" placeholder="Komentarz (opcjonalnie)"></div>
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="checkbox" id="costIsPrivate">
+              <label class="form-check-label small" for="costIsPrivate">🔒 Prywatny (tylko dla pary)</label>
+            </div>
+            <button type="submit" class="btn btn-burgund btn-sm w-100">Zapisz wydatek</button>
+          </form>
+        </div>
+        <div id="costsList"></div>
+      </section>
+
+      <!-- Zakładka 3: Portfel (Rozliczenia) -->
+      <section id="tab-wallet" class="app-tab" style="display: none;">
+        <h4 class="fw-bold mb-3">🏦 Bilans Ekipy</h4>
+        <div class="card p-3 border-0 shadow-sm rounded-4 mb-3">
+          <h6 class="text-danger fw-bold">🔴 Mamy oddać:</h6>
+          <div id="walletOweList" class="small mb-3"></div>
+          <h6 class="text-success fw-bold">🟢 Ktoś nam zalega:</h6>
+          <div id="walletDueList" class="small mb-3"></div>
+          <hr>
+          <div class="d-flex justify-content-between align-items-center">
+            <span class="fw-bold">Bilans końcowy:</span>
+            <span id="walletTotalSummary" class="fs-5 fw-bold">0.00 PLN</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Zakładka 4: Zakupy -->
+      <section id="tab-shopping" class="app-tab" style="display: none;">
+        <h4 class="fw-bold mb-3">🛒 Listy Zakupów</h4>
+        <div class="d-flex gap-2 mb-3">
+          <button id="btnNewShoppingList" class="btn btn-burgund btn-sm">+ Nowa lista</button>
+          <select id="shoppingListSelect" class="form-select form-select-sm"></select>
+        </div>
+        <div class="input-group input-group-sm mb-3">
+          <input type="text" id="newProductInput" class="form-control" placeholder="Dodaj produkt...">
+          <button id="btnAddProduct" class="btn btn-outline-secondary">Dodaj</button>
+        </div>
+        <ul id="shoppingItemsList" class="list-group mb-3"></ul>
+      </section>
+
+      <!-- Zakładka 5: Płacimy Razem -->
+      <section id="tab-tickets" class="app-tab" style="display: none;">
+        <h4 class="fw-bold mb-3">📊 Płacimy Razem (Bilety)</h4>
+        <div class="card p-3 border-0 shadow-sm rounded-4">
+          <div class="mb-2">
+            <label class="small fw-bold">Waluta:</label>
+            <select id="calcCurrency" class="form-select form-select-sm">
+              <option value="HUF">HUF</option><option value="PLN">PLN</option><option value="EUR">EUR</option>
+            </select>
+          </div>
+          <div class="mb-2">
+            <label class="small fw-bold">Cena biletu normalnego:</label>
+            <input type="number" id="calcNormal" class="form-control form-control-sm" value="0">
+          </div>
+          <div class="mb-3">
+            <label class="small fw-bold">Cena biletu ulgowego:</label>
+            <input type="number" id="calcReduced" class="form-control form-control-sm" value="0">
+          </div>
+          <div id="calcResults" class="p-3 bg-light rounded-3"></div>
+        </div>
+      </section>
+
+      <!-- Zakładka 6: Kantor -->
+      <section id="tab-exchange" class="app-tab" style="display: none;">
+        <h4 class="fw-bold mb-3">💱 Kantor Wymiany</h4>
+        <div class="card p-3 border-0 shadow-sm rounded-4">
+          <input type="number" id="exAmount" class="form-control form-control-sm mb-2" value="100">
+          <div class="row g-2 mb-2">
+            <div class="col-6"><select id="exFrom" class="form-select form-select-sm"><option value="PLN">PLN</option><option value="HUF" selected>HUF</option><option value="EUR">EUR</option></select></div>
+            <div class="col-6"><select id="exTo" class="form-select form-select-sm"><option value="PLN" selected>PLN</option><option value="HUF">HUF</option><option value="EUR">EUR</option></select></div>
+          </div>
+          <div id="exResult" class="p-3 text-center rounded-3 my-2" style="background:#FFF2F2; border:1px solid var(--burgund);">
+            <div class="fs-4 fw-bold" style="color:var(--burgund);">---</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Zakładka 7: Gry i Turnieje -->
+      <section id="tab-games" class="app-tab" style="display: none;">
+        <h4 class="fw-bold mb-3">🎲 Gry i Turnieje</h4>
+        <div class="card p-3 border-0 shadow-sm rounded-4 mb-3">
+          <select id="gameSelect" class="form-select form-select-sm mb-2">
+            <option value="Blocus">Blocus</option><option value="Tysiąc">Tysiąc</option><option value="Remik">Remik</option>
+          </select>
+          <div id="gameActiveArea">Wybierz grę, aby zobaczyć stan partii.</div>
+        </div>
+      </section>
+
+      <!-- Zakładka 8: Pakowanie & Forum -->
+      <section id="tab-forum" class="app-tab" style="display: none;">
+        <h4 class="fw-bold mb-3">💬 Forum Stada</h4>
+        <div class="input-group input-group-sm mb-3">
+          <input type="text" id="forumInput" class="form-control" placeholder="Wiadomość...">
+          <button id="btnSendForum" class="btn btn-burgund">Wyślij</button>
+        </div>
+        <div id="forumMessages"></div>
+      </section>
+    </main>
+
+    <!-- Stopka -->
+    <footer class="footer-fixed d-flex justify-content-between align-items-center">
+      <div>© JBP — <a href="https://github.com" target="_blank" class="fw-bold text-decoration-none" style="color:var(--burgund);">GitHub</a></div>
+      <div>📅 Last edit: <b>16.07.2026 r.</b></div>
+    </footer>
+  </div>
+
+  <!-- Skrypty zewnętrzne (Supabase JS, Bootstrap, Leaflet) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  
+  <!-- Główny skrypt aplikacji -->
+  <script src="js/app.js"></script>
 </body>
 </html>

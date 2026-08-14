@@ -1,8 +1,0 @@
-streamlit
-supabase
-extra-streamlit-components
-requests
-folium
-streamlit-folium
-pandas
-streamlit-cookies-controller

@@ -1,3 +1,9 @@
-.streamlit/
-.streamlit/*
-.streamlit/secrets.toml
+# Śmieci systemowe i edytora
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Kopie zapasowe i pliki tymczasowe
+*.bak
+*.tmp
