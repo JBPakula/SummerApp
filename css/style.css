@@ -227,3 +227,72 @@ body {
     z-index: 9999;
     font-size: 0.8rem;
 }
+
+/* Zmuszenie głównego widoku aplikacji do zajęcia dokładnie wysokości ekranu */
+#appSection {
+    display: flex !important;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden; /* Blokuje przewijanie całej strony */
+}
+
+/* Główny kontener z przyciskami - niech zajmuje dostępną przestrzeń */
+main.container {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center; /* Wyśrodkowanie pionowe przycisków */
+    overflow-y: auto;        /* Pozwala przewijać tylko wewnątrz sekcji, jeśli będzie za dużo treści */
+    padding-bottom: 20px;
+}
+
+/* Obrazek winnicy - niech będzie tłem lub dolnym elementem, który się skaluje */
+.winnica-bg {
+    width: 100%;
+    max-height: 25vh; /* Ograniczamy wysokość obrazka, żeby nie wypychał przycisków */
+    object-fit: cover;
+    border-radius: 15px 15px 0 0;
+}
+
+* --- BLOKADA SCROLLA I IDEALNE DOPASOWANIE PULPITU --- */
+html, body {
+  height: 100%;
+  overflow-x: hidden;
+}
+
+/* Układ całego pulpitu na wysokość ekranu */
+#tab-dashboard {
+  min-height: calc(100vh - 120px);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+/* Kompaktowe kafelki - mniejsze marginesy i paddingi */
+.dashboard-card {
+  border-radius: 14px !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  background-color: rgba(255, 255, 255, 0.92) !important;
+  backdrop-filter: blur(4px);
+  transition: transform 0.1s ease;
+}
+
+.dashboard-card:active {
+  transform: scale(0.97);
+}
+
+.tile-title {
+  color: #8B0000;
+  font-size: 0.95rem;
+  line-height: 1.2;
+}
+
+.tile-desc {
+  font-size: 0.72rem;
+  line-height: 1.1;
+}
+
+.dashboard-logo {
+  max-height: 55px;
+  width: auto;
+}
