@@ -122,3 +122,9 @@ button:hover {
     box-sizing: border-box;
     z-index: 9999;
 }
+
+
+/* Maskowanie kropek w polu hasła bez wywoływania menedżera haseł Chrome */
+div[data-testid="stTextInput"] input[aria-label="Hasło:"] {
+    -webkit-text-security: disc !important;
+}

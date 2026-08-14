@@ -9,6 +9,15 @@ import requests
 from supabase import create_client, Client
 import extra_streamlit_components as stx
 
+
+# --- 1. KONFIGURACJA STRONY (Zawsze pierwsze wywołanie st!) ---
+st.set_page_config(
+    page_title="Wakacje Stada",
+    page_icon="assets/logo.png",  
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
+
 # --- POŁĄCZENIE Z SUPABASE ---
 URL_SUPABASE = st.secrets["SUPABASE_URL"]
 KEY_SUPABASE = st.secrets["SUPABASE_KEY"]
@@ -22,6 +31,7 @@ supabase = inicjalizuj_supabase()
 # Konfiguracja MOBILE FIRST
 st.set_page_config(page_title="Wakacje Stada", layout="centered", initial_sidebar_state="collapsed")
 
+
 # --- WCZYTANIE STYLÓW CSS (UI/UX) ---
 def wczytaj_style_css():
     sciezka_css = os.path.join("style", "custom.css")
@@ -32,7 +42,7 @@ def wczytaj_style_css():
 wczytaj_style_css()
 
 # Menedżer ciasteczek
-cookie_manager = stx.CookieManager()
+cookie_manager = stx.CookieManager(key="stado_cookie_mgr")
 
 # --- MATRYCE SYSTEMOWE (POBIERANIE Z SECRETS) ---
 HASLA = st.secrets["passwords"]
@@ -83,11 +93,11 @@ if "ostatnie_lat_lng" not in st.session_state:
 
 # Autologowanie
 if st.session_state.zalogowany_user is None:
-    zapisany_user = cookie_manager.get("stado_user")
-    zapisane_id = cookie_manager.get("stado_uid")
-    if zapisany_user and zapisane_id:
-        st.session_state.zalogowany_user = zapisany_user
-        st.session_state.user_id = int(zapisane_id)
+    ciasteczka = cookie_manager.get_all()
+    if isinstance(ciasteczka, dict) and "stado_user" in ciasteczka:
+        st.session_state.zalogowany_user = ciasteczka["stado_user"]
+        st.session_state.user_id = int(ciasteczka.get("stado_uid", 0))
+        st.rerun()
 
 # LOGOWANIE
 if st.session_state.zalogowany_user is None:
@@ -102,7 +112,7 @@ if st.session_state.zalogowany_user is None:
 
     with st.form("logowanie_form"):
         wybrane_imie = st.selectbox("Kim jesteś?", list(HASLA.keys()))
-        wpisane_haslo = st.text_input("Hasło:", type="password")
+        wpisane_haslo = st.text_input("Hasło:", key="pole_haslo")
         przycisk_zaloguj = st.form_submit_button(
             "Wejdź do aplikacji", use_container_width=True
         )
@@ -126,7 +136,10 @@ if st.session_state.zalogowany_user is None:
                         st.session_state.user_id = uid
                         st.session_state.zalogowany_user = wybrane_imie
 
-                        expires_date = datetime(2026, 8, 31)
+                        # Zapis ciasteczek z obsługą strefy czasowej UTC
+                        expires_date = datetime(
+                            2026, 8, 31, 23, 59, 59, tzinfo=timezone.utc
+                        )
                         try:
                             cookie_manager.set(
                                 "stado_user",
