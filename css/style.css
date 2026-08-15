@@ -64,16 +64,38 @@ html, body {
 /* 0.2 PULPIT (DASHBOARD) */
 /* ============================================================================== */
 .dashboard-container {
+  position: relative;
+  min-height: calc(100dvh - 105px); /* Dokładna wysokość ekranu od paska do stopki */
   display: flex;
   flex-direction: column;
-  min-height: calc(100dvh - 95px); /* Rozciąga pulpit dokładnie do stopki (dvh dopasowuje się do ekranu telefonu) */
+  background-color: #FFFFFF;
+  border-radius: 16px;
+  padding: 10px 10px 20px 10px;
+  overflow: hidden;
+  box-sizing: border-box;
+
+  /* Wielowarstwowe tło: miękki gradient zlewający się z niebem + krajobraz na samym dole */
+  background-image: 
+      linear-gradient(
+          to bottom,
+          #FFFFFF 0%,
+          #FFFFFF 42%,
+          rgba(255, 255, 255, 0.85) 58%,
+          rgba(255, 255, 255, 0.2) 72%,
+          rgba(255, 255, 255, 0) 85%
+      ),
+      url('../assets/landscape.webp');
+  background-position: top center, bottom center;
+  background-size: 100% 100%, 100% auto;
+  background-repeat: no-repeat, no-repeat;
 }
 
+/* Kafelki z półprzezroczystym tłem i efektem szkła (czytelne nawet na tle wzgórz) */
 .dashboard-card {
-  background: rgba(255, 255, 255, 0.95) !important;
+  background: rgba(255, 255, 255, 0.92) !important;
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
-  border: 1px solid rgba(197, 188, 176, 0.8) !important;
+  border: 1px solid rgba(197, 188, 176, 0.85) !important;
   border-radius: 12px !important;
   transition: transform 0.12s ease, background-color 0.12s ease;
   cursor: pointer;
@@ -89,7 +111,7 @@ html, body {
 
 .tile-title {
   color: var(--burgund);
-  font-size: 0.95rem;
+  font-size: 0.92rem;
   line-height: 1.2;
 }
 
@@ -97,27 +119,6 @@ html, body {
   font-size: 0.72rem;
   margin-top: 2px;
   line-height: 1.1;
-}
-
-/* Kontener spychający krajobraz na sam dół */
-.dashboard-landscape-wrapper {
-  margin-top: auto; /* Kluczowe: automatycznie spycha grafikę na sam dół do stopki */
-  width: 100%;
-  padding-top: 10px;
-}
-
-/* Krajobraz: widać CAŁE zdjęcie (wzgórza + winorośla na dole) bez ucinania kadrów */
-.dashboard-landscape-img {
-  width: 100%;
-  height: auto; /* Kluczowe: zachowuje pełne proporcje i pokazuje cały kadr */
-  max-height: 380px;
-  object-fit: contain;
-  display: block;
-  margin: 0 auto;
-  
-  /* Miękkie przejście mgły na samej górze nieba */
-  -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.85) 15%, rgba(0,0,0,1) 30%);
-  mask-image: linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.85) 15%, rgba(0,0,0,1) 30%);
 }
 
 /* ============================================================================== */
