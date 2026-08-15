@@ -399,3 +399,46 @@ html, body {
 .btn-swap-currency:active {
   transform: rotate(180deg);
 }
+
+/* --- ROZGRYWKI I PODIUM --- */
+.round-collapsed-card {
+  background-color: #f8f9fa;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  font-size: 0.85rem;
+}
+
+.podium-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: 8px;
+  margin-bottom: 6px;
+  font-size: 0.95rem;
+}
+
+.podium-1 {
+  background: #FEF3C7;
+  border: 1px solid #F59E0B;
+  font-weight: 700;
+}
+
+.podium-2 {
+  background: #F1F5F9;
+  border: 1px solid #94A3B8;
+  font-weight: 600;
+}
+
+.podium-3 {
+  background: #FFEDD5;
+  border: 1px solid #FB923C;
+  font-weight: 600;
+}
+
+.podium-other {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+}

@@ -245,7 +245,7 @@ function switchTab(tabName) {
     if (offcanvas) offcanvas.hide();
   }
 
-  // Dopasowanie i pokazanie wybranej sekcji
+ // Dopasowanie i pokazanie wybranej sekcji
   if (tabName === "dashboard" || tabName.includes("Pulpit")) {
     document.getElementById("tab-dashboard").style.display = "block";
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -264,7 +264,6 @@ function switchTab(tabName) {
     document.getElementById("tab-shopping").style.display = "block";
     loadShoppingLists();
   } else if (tabName.includes("bilety") || tabName.includes("Bilety") || tabName.includes("Płacimy") || tabName === "calc") {
-    // Poprawne ID: tab-calc
     const tabCalc = document.getElementById("tab-calc");
     if (tabCalc) {
       tabCalc.style.display = "block";
@@ -273,8 +272,9 @@ function switchTab(tabName) {
   } else if (tabName.includes("Kantor")) {
     document.getElementById("tab-exchange").style.display = "block";
     przeliczKantor();
-  } else if (tabName.includes("Rozgrywki")) {
+  } else if (tabName.includes("Rozgrywki") || tabName === "games") {
     document.getElementById("tab-games").style.display = "block";
+    loadGames();
   } else if (tabName.includes("Forum")) {
     document.getElementById("tab-forum").style.display = "block";
     loadForum();
@@ -1114,6 +1114,318 @@ if (formFinish) {
     loadWallet();
   };
 }
+
+// ==============================================================================
+// 7.5 MODUŁ: ROZGRYWKI
+// ==============================================================================
+let activeGameId = null;
+let activeGamePlayers = [];
+let activeGameLowScoreWins = false;
+let currentRoundNumber = 1;
+
+async function loadGames() {
+  setupGameCreationUI();
+  checkActiveGame();
+  loadPastGames();
+}
+
+function setupGameCreationUI() {
+  const container = document.getElementById("gamePlayersCheckboxes");
+  if (container && container.children.length === 0) {
+    Object.keys(ekipyMapa).sort().forEach(uName => {
+      const label = document.createElement("label");
+      label.className = "badge bg-white text-dark border p-2 small";
+      label.innerHTML = `<input type="checkbox" class="game-player-cb" value="${uName}"> ${uName}`;
+      container.appendChild(label);
+    });
+  }
+
+  const selType = document.getElementById("gameTypeSelect");
+  const customBox = document.getElementById("customGameContainer");
+  const lowScoreSwitch = document.getElementById("customLowScoreWins");
+  const scoreRuleLabel = document.getElementById("labelScoreRule");
+
+  if (selType && customBox) {
+    selType.onchange = () => {
+      customBox.style.display = selType.value === "Inna" ? "block" : "none";
+    };
+  }
+
+  if (lowScoreSwitch && scoreRuleLabel) {
+    lowScoreSwitch.onchange = () => {
+      scoreRuleLabel.innerText = lowScoreSwitch.checked ? "📉 Wygrywa: NAJMNIEJ pkt" : "📈 Wygrywa: NAJWIĘCEJ pkt";
+    };
+  }
+}
+
+// 1. Sprawdzanie czy trwa już aktywna gra
+async function checkActiveGame() {
+  const { data } = await supabaseClient
+    .from("games")
+    .select("*")
+    .eq("finished", false)
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  if (data && data.length > 0) {
+    const game = data[0];
+    activeGameId = game.id;
+    activeGameLowScoreWins = game.low_score_wins;
+    
+    document.getElementById("gameSetupCard").style.display = "none";
+    document.getElementById("gamePodiumCard").style.display = "none";
+    document.getElementById("activeGameArea").style.display = "block";
+
+    document.getElementById("activeGameTitle").innerText = game.game_name;
+    document.getElementById("activeGameRuleText").innerText = game.low_score_wins ? "📉 Wygrywa najmniej pkt" : "📈 Wygrywa najwięcej pkt";
+
+    await renderActiveGameRounds();
+  } else {
+    document.getElementById("gameSetupCard").style.display = "block";
+    document.getElementById("activeGameArea").style.display = "none";
+  }
+}
+
+// 2. Rozpoczęcie nowej rozgrywki
+const btnStartGame = document.getElementById("btnStartGame");
+if (btnStartGame) {
+  btnStartGame.onclick = async () => {
+    const selectedCbs = Array.from(document.querySelectorAll(".game-player-cb:checked"));
+    const warning = document.getElementById("playersCountWarning");
+
+    if (selectedCbs.length < 2) {
+      if (warning) warning.style.display = "block";
+      return;
+    }
+    if (warning) warning.style.display = "none";
+
+    const selType = document.getElementById("gameTypeSelect").value;
+    let gameName = selType;
+    let lowScoreWins = false;
+
+    if (selType === "Blokus") {
+      lowScoreWins = true;
+    } else if (selType === "1000" || selType === "Remik" || selType === "Carcassonne") {
+      lowScoreWins = false;
+    } else if (selType === "Inna") {
+      const customName = document.getElementById("customGameNameInput").value.trim();
+      gameName = customName || "Własna Gra";
+      const customLowCb = document.getElementById("customLowScoreWins");
+      lowScoreWins = customLowCb ? customLowCb.checked : false;
+    }
+
+    const { data: newGame } = await supabaseClient.from("games").insert({
+      game_name: gameName,
+      finished: false,
+      low_score_wins: lowScoreWins,
+      created_by: currentUserId
+    }).select().single();
+
+    if (newGame) {
+      activeGameId = newGame.id;
+      activeGamePlayers = selectedCbs.map(cb => cb.value);
+      activeGameLowScoreWins = lowScoreWins;
+      currentRoundNumber = 1;
+
+      for (const p of activeGamePlayers) {
+        await supabaseClient.from("gamescores").insert({
+          game_id: activeGameId,
+          player_name: p,
+          round_number: 1,
+          points: 0
+        });
+      }
+
+      checkActiveGame();
+    }
+  };
+}
+
+// 3. Renderowanie rund w aktywnej grze
+async function renderActiveGameRounds() {
+  const { data: scores } = await supabaseClient
+    .from("gamescores")
+    .select("*")
+    .eq("game_id", activeGameId)
+    .order("round_number", { ascending: true });
+
+  if (!scores || scores.length === 0) return;
+
+  activeGamePlayers = [...new Set(scores.map(s => s.player_name))];
+  const maxRound = Math.max(...scores.map(s => s.round_number));
+  currentRoundNumber = maxRound;
+
+  // Renderowanie ukończonych rund
+  const compContainer = document.getElementById("completedRoundsList");
+  compContainer.innerHTML = "";
+
+  for (let r = 1; r < maxRound; r++) {
+    const roundScores = scores.filter(s => s.round_number === r);
+    const scoreStr = roundScores.map(s => `<b>${s.player_name}:</b> ${s.points} pkt`).join(" | ");
+    
+    const row = document.createElement("div");
+    row.className = "round-collapsed-card d-flex justify-content-between align-items-center";
+    row.innerHTML = `<span><b>Runda ${r}:</b> ${scoreStr}</span> <span class="badge bg-secondary">Zakończona</span>`;
+    compContainer.appendChild(row);
+  }
+
+  // Renderowanie bieżącej rundy
+  document.getElementById("currentRoundTitle").innerText = `Runda ${maxRound}`;
+  const currentInputs = document.getElementById("currentRoundInputs");
+  currentInputs.innerHTML = "";
+
+  const currRoundScores = scores.filter(s => s.round_number === maxRound);
+
+activeGamePlayers.forEach(pName => {
+    const pScore = currRoundScores.find(s => s.player_name === pName);
+    const val = pScore ? pScore.points : 0;
+
+    const col = document.createElement("div");
+    col.className = "col-6";
+    col.innerHTML = `
+      <label class="small fw-bold text-muted">${pName}:</label>
+      <input type="number" 
+             class="form-control form-control-sm round-score-input" 
+             data-player="${pName}" 
+             value="${val}" 
+             onfocus="if(this.value==='0') this.value='';" 
+             onblur="if(this.value==='') this.value='0';">
+    `;
+    currentInputs.appendChild(col);
+  });
+}
+
+// 4. Zapis punktów i przejście do kolejnej rundy
+const btnNextRound = document.getElementById("btnNextRound");
+if (btnNextRound) {
+  btnNextRound.onclick = async () => {
+    const inputs = document.querySelectorAll(".round-score-input");
+    
+    for (const inp of inputs) {
+      const pName = inp.getAttribute("data-player");
+      const pts = parseInt(inp.value, 10) || 0;
+      await supabaseClient.from("gamescores").update({ points: pts })
+        .eq("game_id", activeGameId)
+        .eq("round_number", currentRoundNumber)
+        .eq("player_name", pName);
+    }
+
+    const nextRound = currentRoundNumber + 1;
+    for (const p of activeGamePlayers) {
+      await supabaseClient.from("gamescores").insert({
+        game_id: activeGameId,
+        player_name: p,
+        round_number: nextRound,
+        points: 0
+      });
+    }
+
+    renderActiveGameRounds();
+  };
+}
+
+// 5. Zakończenie gry i wyliczenie podium
+const btnFinishGame = document.getElementById("btnFinishGame");
+if (btnFinishGame) {
+  btnFinishGame.onclick = async () => {
+    if (!confirm("Czy na pewno chcesz zakończyć tę rozgrywkę i podsumować wyniki?")) return;
+
+    const inputs = document.querySelectorAll(".round-score-input");
+    for (const inp of inputs) {
+      const pName = inp.getAttribute("data-player");
+      const pts = parseInt(inp.value, 10) || 0;
+      await supabaseClient.from("gamescores").update({ points: pts })
+        .eq("game_id", activeGameId)
+        .eq("round_number", currentRoundNumber)
+        .eq("player_name", pName);
+    }
+
+    await supabaseClient.from("games").update({ finished: true }).eq("id", activeGameId);
+    showPodium(activeGameId);
+  };
+}
+
+async function showPodium(gameId) {
+  const { data: game } = await supabaseClient.from("games").select("*").eq("id", gameId).single();
+  const { data: scores } = await supabaseClient.from("gamescores").select("*").eq("game_id", gameId);
+
+  if (!scores || !game) return;
+
+  const totals = {};
+  scores.forEach(s => {
+    totals[s.player_name] = (totals[s.player_name] || 0) + s.points;
+  });
+
+  const sorted = Object.entries(totals).sort((a, b) => {
+    return game.low_score_wins ? a[1] - b[1] : b[1] - a[1];
+  });
+
+  const podiumList = document.getElementById("podiumList");
+  podiumList.innerHTML = "";
+
+  sorted.forEach(([pName, totalPts], index) => {
+    let medal = `${index + 1}.`;
+    let rowClass = "podium-other";
+
+    if (index === 0) { medal = "🥇 1. miejsce"; rowClass = "podium-1"; }
+    else if (index === 1) { medal = "🥈 2. miejsce"; rowClass = "podium-2"; }
+    else if (index === 2) { medal = "🥉 3. miejsce"; rowClass = "podium-3"; }
+
+    const div = document.createElement("div");
+    div.className = `podium-row ${rowClass}`;
+    div.innerHTML = `<span><b>${medal}</b> ${pName}</span> <span class="badge bg-dark fs-6">${totalPts} pkt</span>`;
+    podiumList.appendChild(div);
+  });
+
+  document.getElementById("activeGameArea").style.display = "none";
+  document.getElementById("gameSetupCard").style.display = "none";
+  document.getElementById("gamePodiumCard").style.display = "block";
+  loadPastGames();
+}
+
+const btnNewGameReset = document.getElementById("btnNewGameReset");
+if (btnNewGameReset) {
+  btnNewGameReset.onclick = () => {
+    activeGameId = null;
+    document.getElementById("gamePodiumCard").style.display = "none";
+    document.getElementById("gameSetupCard").style.display = "block";
+    document.querySelectorAll(".game-player-cb").forEach(cb => cb.checked = false);
+    const customLow = document.getElementById("customLowScoreWins");
+    if (customLow) customLow.checked = false;
+    const ruleLabel = document.getElementById("labelScoreRule");
+    if (ruleLabel) ruleLabel.innerText = "📈 Wygrywa: NAJWIĘCEJ pkt";
+  };
+}
+
+// 6. Archiwum gier
+async function loadPastGames() {
+  const container = document.getElementById("pastGamesList");
+  if (!container) return;
+  container.innerHTML = "";
+
+  const { data: pastGames } = await supabaseClient
+    .from("games")
+    .select("*")
+    .eq("finished", true)
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  if (pastGames && pastGames.length > 0) {
+    pastGames.forEach(g => {
+      const d = g.created_at.substring(0, 10);
+      const item = document.createElement("div");
+      item.className = "d-flex justify-content-between align-items-center py-2 border-bottom";
+      item.innerHTML = `
+        <div><b>${g.game_name}</b> <small class="text-muted">(${d})</small></div>
+        <button class="btn btn-sm btn-outline-secondary py-0" style="font-size:11px;" onclick="showPodium(${g.id})">Zobacz wyniki</button>
+      `;
+      container.appendChild(item);
+    });
+  } else {
+    container.innerHTML = "<div class='text-muted small'>Brak zakończonych rozgrywek.</div>";
+  }
+}
+
 // ==============================================================================
 // 8. MODUŁ: PŁACIMY RAZEM, KANTOR I FORUM
 // ==============================================================================

@@ -529,17 +529,85 @@
       </section>
 
     
-      <!-- 7. Zakładka: Gry -->
+     <!-- 7. Zakładka: Rozgrywki -->
       <section id="tab-games" class="app-tab" style="display: none;">
         <div class="d-flex align-items-center justify-content-between mb-3">
-          <h4 class="fw-bold mb-0">🎲 Gry i Turnieje</h4>
+          <h4 class="fw-bold mb-0">🎲 Rozgrywki</h4>
           <button class="btn btn-sm btn-outline-secondary" onclick="switchTab('dashboard')"><i class="bi bi-arrow-left"></i> Wróć</button>
         </div>
-        <div class="card p-3 border-0 shadow-sm rounded-4 mb-3">
-          <select id="gameSelect" class="form-select form-select-sm mb-2">
-            <option value="Blocus">Blocus</option><option value="Tysiąc">Tysiąc</option><option value="Remik">Remik</option>
-          </select>
-          <div id="gameActiveArea">Wybierz grę, aby zobaczyć stan partii.</div>
+
+        <!-- 1. KROK: Kreator nowej gry (jeśli brak aktywnej rozgrywki) -->
+        <div id="gameSetupCard" class="card p-3 border-0 shadow-sm rounded-4 mb-4" style="background: #FFFFFF; border-left: 5px solid var(--burgund) !important;">
+          <h6 class="fw-bold mb-3" style="color: var(--burgund);">➕ Nowa rozgrywka</h6>
+          
+        <!-- Wybór gry -->
+          <div class="mb-3">
+            <label class="small fw-bold text-muted mb-1">Wybierz grę:</label>
+            <select id="gameTypeSelect" class="form-select form-select-sm mb-2">
+              <option value="Blokus">Blokus (wygrywa najmniej pkt)</option>
+              <option value="1000">1000 (wygrywa najwięcej pkt)</option>
+              <option value="Remik">Remik (wygrywa najwięcej pkt)</option>
+              <option value="Carcassonne">Carcassonne (wygrywa najwięcej pkt)</option>
+              <option value="Inna">Inna gra (wpisz własną)...</option>
+            </select>
+            
+            <div id="customGameContainer" style="display: none;" class="p-3 border rounded-3 bg-light mb-2">
+              <input type="text" id="customGameNameInput" class="form-control form-control-sm mb-3" placeholder="Wpisz nazwę gry...">
+              
+              <!-- Elegancki suwak wyboru zasady wygranej -->
+              <div class="d-flex align-items-center justify-content-between p-2 bg-white rounded-3 border">
+                <span class="small fw-bold" id="labelScoreRule">📈 Wygrywa: NAJWIĘCEJ pkt</span>
+                <div class="form-check form-switch m-0">
+                  <input class="form-check-input" type="checkbox" id="customLowScoreWins" style="cursor: pointer; width: 2.5em; height: 1.3em;">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Wybór graczy (min. 2) -->
+          <div class="mb-3">
+            <label class="small fw-bold text-muted d-block mb-1">Wybierz graczy (zaznacz min. 2 osoby):</label>
+            <div id="gamePlayersCheckboxes" class="d-flex flex-wrap gap-1 p-2 border rounded-3 bg-light"></div>
+            <small id="playersCountWarning" class="text-danger small" style="display: none;">Wybierz co najmniej 2 graczy!</small>
+          </div>
+
+          <button id="btnStartGame" class="btn btn-burgund btn-sm w-100 py-2">▶ Rozpocznij rozgrywkę</button>
+        </div>
+
+        <!-- 2. KROK: Trwająca rozgrywka (Rundy i wpisywanie punktów) -->
+        <div id="activeGameArea" style="display: none;">
+          <div class="card p-3 border-0 shadow-sm rounded-4 mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+              <div>
+                <h5 class="fw-bold mb-0" id="activeGameTitle" style="color: var(--burgund);">Gra</h5>
+                <small class="text-muted" id="activeGameRuleText"></small>
+              </div>
+              <button id="btnFinishGame" class="btn btn-danger btn-sm px-3">🏁 Zakończ grę</button>
+            </div>
+
+            <!-- Kontener z historią ukończonych rund -->
+            <div id="completedRoundsList" class="mb-2"></div>
+
+            <!-- Kontener bieżącej, otwartej rundy -->
+            <div id="currentRoundBox" class="p-3 border rounded-3 bg-light mt-2">
+              <h6 class="fw-bold mb-2 text-primary" id="currentRoundTitle">Runda 1</h6>
+              <div id="currentRoundInputs" class="row g-2 mb-3"></div>
+              <button id="btnNextRound" class="btn btn-primary btn-sm w-100">✓ Zapisz i rozpocznij następną rundę</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. KROK: Wyniki i Podium zakończonej gry -->
+        <div id="gamePodiumCard" class="card p-3 border-0 shadow-sm rounded-4 mb-4 text-center" style="display: none;">
+          <h5 class="fw-bold mb-3" style="color: var(--burgund);">🏆 Wyniki końcowe</h5>
+          <div id="podiumList" class="mb-3 text-start"></div>
+          <button id="btnNewGameReset" class="btn btn-burgund btn-sm w-100">Nowa rozgrywka</button>
+        </div>
+
+        <!-- 4. KROK: Historia ostatnich gier -->
+        <div class="card p-3 border-0 shadow-sm rounded-4 mb-4">
+          <h6 class="fw-bold mb-2" style="color: var(--burgund);">📜 Archiwum rozgrywek:</h6>
+          <div id="pastGamesList" class="small text-muted"></div>
         </div>
       </section>
 
