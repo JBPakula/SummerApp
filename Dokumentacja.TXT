@@ -1,62 +1,105 @@
 ========================================================================
              DOKUMENTACJA PROJEKTU: APLIKACJA "WAKACJE STADA 2026"
 ========================================================================
-Ostatnia aktualizacja: 07.07.2026 r.
+Ostatnia aktualizacja: 16.08.2026 r.
 Autor: JBP
-Status projektu: Gotowy szkielet logiki (Przed wdrożeniem security/RLS i frontu)
+Status projektu: Produkcyjny / PWA (Vanilla JS + Supabase BaaS)
 
 1. STOS TECHNOLOGICZNY (TECH STACK)
 ------------------------------------------------------------------------
-* Frontend & App Framework: Streamlit (z opcją Mobile First - układ centered).
-* Baza danych (Backend): Supabase (PostgreSQL) — komunikacja przez oficjalną 
-  bibliotekę `supabase-py`.
-* Mapy i Geokalizacja: Folium + Streamlit-Folium do interaktywnej wizualizacji.
-* Zarządzanie sesją/uwierzytelnianie: Extra Streamlit Components (CookieManager) 
-  do trwałego przechowywania sesji w przeglądarce (autologowanie).
-* Dane kursów walut: Frankfurter API (dynamiczne pobieranie kursów rynkowych).
+* Frontend & Architektura: Single Page Application (SPA) w układzie 
+  Hub-and-Spoke, czysty Vanilla JavaScript (ES6+), HTML5 oraz CSS3 Mobile First.
+* Framework UI & Ikony: Bootstrap 5.3.3 oraz Bootstrap Icons.
+* Mapy i Warstwa Przestrzenna: Leaflet.js 1.9.4 z kafelkami OpenStreetMap.
+* Backend & Baza Danych: Supabase (PostgreSQL 15, protokół Realtime, 
+  funkcja RPC login_user do autoryzacji) poprzez bibliotekę @supabase/supabase-js v2.
+* PWA & Zarządzanie Cache: Web App Manifest (manifest.json), praca w trybie 
+  pełnoekranowym na smartfonach oraz mechanizm cache-bustera (?t=Date.now()).
+* Kursy Walut: Frankfurter API (kursy referencyjne Europejskiego Banku 
+  Centralnego pobierane w czasie rzeczywistym).
 
 2. STRUKTURA BAZY DANYCH (SUPABASE REPOSITORIES)
 ------------------------------------------------------------------------
-* users / Users: id (int), login (text), spouse_id (int), team (text).
-* map / Map: id, name, category, address, lat, lng, created_by.
-* costs / Costs: id, created_by, paid_by, amount, currency, cost_name, 
-  borrower, is_private, comment, deleted (boolean).
-* shoppinglists / shoppingitems: Struktura relacyjna list i produktów z 
-  flagą bought (boolean).
-* games / gamescores: Struktura turniejowa (gra, runda, punkty per gracz).
-* packing / forum: Proste tabele komentarzy i wpisów (log, stworzony przez).
+* users: id, login, team, spouse_id.
+* map: id, name, category, address, lat, lng, photo, distance_from_egerszalok, 
+  opening_hours, prices, official_url, created_by.
+* costs: id, created_at, created_by, paid_by, amount, currency (HUF/PLN/EUR), 
+  cost_name, borrower, comment, is_private, settled_by, deleted.
+* shoppinglists: id, created_at, created_by, closed.
+* shoppingitems: id, list_id, product_name, bought.
+* games: id, created_at, created_by, game_name, low_score_wins, finished.
+* gamescores: id, game_id, round_number, player_name, points.
+* forum_topics: id, created_at, created_by, title, is_archived, deleted.
+* forum: id, created_at, created_by, topic_id, comment, deleted.
 
-3. ZAKRES FUNKCJONALNOŚCI (MODUŁY I LOGIKA BIZNESOWA)
+3. ARCHITEKTURA SYSTEMU I INTERFEJS
 ------------------------------------------------------------------------
-A. Tryby aplikacji (Dynamic Sidebar)
-   - Przygotowanie: Odliczanie dni do wyjazdu (19.08.2026). Filtruje zakładki.
-   - Na wyjeździe: Pełen dostęp do modułów rozliczeniowych i turniejowych.
-B. Interaktywna Mapa
-   - Integracja bazy Ámbitus ház w Egerszalók.
-   - Przycisk "🏠 Dom" resetujący widok mapy do punktu startowego.
-   - Wyświetlanie numerowanych pinezek (#1, #2...) bezpośrednio na mapie.
-   - Spis atrakcji w formie estetycznych tekstowych hiperlinków (w locie 
-     centrują i przybliżają mapę na dany obiekt).
-   - Możliwość kliknięcia w dowolne miejsce na mapie i dodania nowego punktu.
-C. Koszykowy Portfel (Mechanizm Paragonu i Bilansowania Rodzinnego)
-   - Praca na strukturach zespołów (Teamów): Pakuły, Bobry, Sileziny, Robaki.
-   - Algorytm podziału kosztów dla "Całego Stada" (dzielone na 15 osób):
-     * Pakuły, Sileziny, Robaki: 4 * (kwota / 15)
-     * Bobry: 3 * (kwota / 15)
-   - Precyzyjne ujęcie przepływu gotówki: wydatki dodane przez danego użytkownika 
-     zalicza jako jego osobisty wkład, pomijając generowanie długu u współmałżonka.
-   - Prezentacja danych w formie czytelnego paragonu (Rozbicie per waluta: 
-     HUF, PLN, EUR) bez zbędnych opisów kontekstowych.
-   - Podsumowanie i bilans końcowy (RAZEM) podawany ZAWSZE w PLN, przeliczany 
-     dynamicznie według kursów ustalonych w zakładce Kantor.
-D. Inteligentna Lista Zakupowa
-   - Odznaczenie ostatniego kupionego produktu automatycznie wywołuje bliźniaczy 
-     formularz dodawania wydatków bezpośrednio pod listą.
-   - Zatwierdzenie formularza zasila główną tabelę kosztów (`costs`) według 
-     algorytmu Portfela i trwale zamyka listę przed edycją.
-E. Płacimy Razem i Kantor
-   - Kalkulator biletów (normalne/ulgowe) z podziałem na koszty rodzinne.
-   - Możliwość nadpisania rynkowego kursu walut własnym kursem z kantoru.
-F. Turniej Gier (Logika Blocus)
-   - Rejestracja rund i punktów. Przy wyborze gry "Blocus" tabela wyników końcowych 
-     jest automatycznie odwracana (mniej punktów = wyższa pozycja).
+* Nawigacja Hub-and-Spoke: Całkowite wyeliminowanie sidebara na rzecz centralnego 
+  Pulpitu. Kliknięcie w nagłówek lub logo natychmiast przenosi na Pulpit.
+* Sesja i Pamięć Lokalna: Trwałe logowanie oraz zapamiętywanie aktywnego 
+  widoku w localStorage (stado_user, stado_token, active_tab, forum_active_topic_id).
+* Autoryzacja i Profile: Weryfikacja hasła przez RPC oraz dynamiczne ładowanie 
+  awatarów (assets/avatars/<login> z fallbackiem do generatora UI-Avatars).
+* Bezpieczeństwo i Usuwanie: Okno czasowe 60 sekund od momentu publikacji 
+  na usunięcie wpisu przez autora (moduły Wydatki oraz Forum).
+
+4. ZAKRES FUNKCJONALNOŚCI (MODUŁY)
+------------------------------------------------------------------------
+
+0. PULPIT GŁÓWNY (LANDING PAGE)
+   - Personalizowany pasek z awatarem użytkownika i powitaniem.
+   - Kalendarz z polskim nazewnictwem dni/miesięcy oraz automatycznym 
+     odliczaniem dni do wyjazdu (19 sierpnia 2026 r.).
+   - Siatka 8 kafelków nawigacyjnych w estetyce Glassmorphism.
+
+1. MODUŁ: MAPA
+   - Domyślna lokalizacja: Ámbitus ház w Egerszalók (Sáfrány út 38/a).
+   - Przycisk szybkiego centrowania widoku na dom.
+   - Kolorystyczne kodowanie pinezek: Termy (niebieski), Zwiedzanie (bursztyn), 
+     Jedzenie i Wino (zieleń), Inne (szary).
+   - Wyszukiwarka tekstowa oraz filtry kategorii.
+   - Wysuwany panel dolny ze szczegółami atrakcji, godzinami, biletami 
+     i bezpośrednią nawigacją Google Maps.
+   - Dodawanie własnych punktów przez kliknięcie na mapie.
+
+2. MODUŁ: FORUM DYSKUSYJNE
+   - Przejrzysty podział na wątki tematyczne.
+   - Wbudowany edytor tekstu (pogrubienie, kursywa, podkreślenie, kolor czcionki).
+   - Zwijane archiwum wątków i licznik postów.
+   - Automatyczne przywracanie ostatnio czytanego wątku po odświeżeniu.
+
+3. MODUŁ: WYDATKI
+   - Ewidencja kosztów w 3 walutach: HUF, PLN, EUR.
+   - Tryb wydatku prywatnego (widoczny tylko dla płatnika i partnera).
+   - Rozliczenia: Całe Stado (podział na 4 ekipy), wybrane ekipy lub konkretne osoby.
+   - Grupowanie historii transakcji według dni.
+
+4. MODUŁ: ZAKUPY
+   - Obsługa wielu list numerowanych sekwencyjnie (#1, #2...).
+   - Podpowiedzi produktów (autocomplete) na bazie bazy danych.
+   - Dynamiczne skreślanie zakupionych artykułów.
+   - Automatyczny modal finalizacji po skreśleniu wszystkich pozycji 
+     i bezpośrednie zasilenie modułu Wydatki.
+
+5. MODUŁ: KANTOR
+   - Pobieranie oficjalnych kursów rynkowych EBC.
+   - Dwustronny kalkulator z przyciskiem szybkiej zamiany walut (⇄).
+   - Szybkie przyciski kwot (1 000, 3 000, 5 000, 10 000, 20 000 HUF).
+   - Możliwość ustawienia własnego kursu wymiany.
+   - Podręczna 5-rzędowa ściągawka przeliczeń.
+
+6. MODUŁ: PORTFEL
+   - Dwustronny bilans wzajemnych rozliczeń sprowadzony do waluty HUF.
+   - Podział na sekcje: Do oddania innym oraz Do odebrania od innych.
+   - Interaktywne oznaczanie spłaty (Rozliczono / Do rozliczenia).
+
+7. MODUŁ: RAZEM ZA BILETY
+   - Kalkulator biletów grupowych dla całej 15-osobowej grupy.
+   - Automatyczny podział na 4 rodziny według proporcji wiekowych (dorośli/dzieci).
+   - Obsługa walut HUF, PLN, EUR oraz czyszczenie zera przy wpisywaniu.
+
+8. MODUŁ: ROZGRYWKI
+   - Szablony gier: Blokus, 1000, Remik, Carcassonne oraz gry własne.
+   - Obsługa reguły odwróconej punktacji (najmniej punktów wygrywa w Blokusie).
+   - Rejestracja kolejnych rund i sumowanie punktów na bieżąco.
+   - Automatyczne generowanie podium z medalami oraz archiwum gier.
