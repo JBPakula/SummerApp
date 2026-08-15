@@ -17,7 +17,12 @@ let currentUserId = null;
 let currentTeam = "Pakuły";
 let currentMode = "Na wyjeździe";
 let mapInstance = null;
-let bazaKursow = {};
+let bazaKursow = {
+  "PLN_HUF": 85.20, "HUF_PLN": 0.0117,
+  "PLN_EUR": 0.23,  "EUR_PLN": 4.32,
+  "EUR_HUF": 368.0, "HUF_EUR": 0.0027,
+  "PLN_PLN": 1.0,   "HUF_HUF": 1.0, "EUR_EUR": 1.0
+};
 let malzenstwaMapa = {};
 let ekipyMapa = {};
 
@@ -42,21 +47,19 @@ async function pobierzKursyWalut() {
   try {
     const res = await fetch("https://api.frankfurter.app/latest?from=EUR&to=PLN,HUF");
     const dane = await res.json();
-    const eurPln = dane.rates.PLN;
-    const eurHuf = dane.rates.HUF;
+    if (dane && dane.rates) {
+      const eurPln = dane.rates.PLN;
+      const eurHuf = dane.rates.HUF;
 
-    bazaKursow = {
-      "PLN_HUF": eurHuf / eurPln, "HUF_PLN": eurPln / eurHuf,
-      "PLN_EUR": 1 / eurPln, "EUR_PLN": eurPln,
-      "EUR_HUF": eurHuf, "HUF_EUR": 1 / eurHuf,
-      "PLN_PLN": 1.0, "HUF_HUF": 1.0, "EUR_EUR": 1.0
-    };
+      bazaKursow = {
+        "PLN_HUF": eurHuf / eurPln, "HUF_PLN": eurPln / eurHuf,
+        "PLN_EUR": 1 / eurPln,      "EUR_PLN": eurPln,
+        "EUR_HUF": eurHuf,          "HUF_EUR": 1 / eurHuf,
+        "PLN_PLN": 1.0,             "HUF_HUF": 1.0, "EUR_EUR": 1.0
+      };
+    }
   } catch (e) {
-    bazaKursow = {
-      "PLN_HUF": 85.20, "HUF_PLN": 0.0117, "PLN_EUR": 0.23,
-      "EUR_PLN": 4.32, "EUR_HUF": 368.0, "HUF_EUR": 0.0027,
-      "PLN_PLN": 1.0, "HUF_HUF": 1.0, "EUR_EUR": 1.0
-    };
+    console.warn("Używam domyślnych kursów walut:", e);
   }
 }
 
@@ -1129,9 +1132,9 @@ function przeliczBilety() {
     <h5 class="fw-bold" style="color:var(--burgund);">Razem: ${total.toFixed(2)} ${wal}</h5>
     <ul class="list-unstyled small mb-0 mt-2">
       <li>🦫 <b>Bobry (3 os.):</b> ${bKoszt.toFixed(2)} ${wal}</li>
-      <li>🐗 <b>Pakuły (4 os.):</b> ${pKoszt.toFixed(2)} ${wal}</li>
+      <li>🐱 <b>Pakuły (4 os.):</b> ${pKoszt.toFixed(2)} ${wal}</li>
       <li>🪱 <b>Robaki (4 os.):</b> ${rKoszt.toFixed(2)} ${wal}</li>
-      <li>⛰️ <b>Sileziny (4 os.):</b> ${sKoszt.toFixed(2)} ${wal}</li>
+      <li>🐿️ <b>Sileziny (4 os.):</b> ${sKoszt.toFixed(2)} ${wal}</li>
     </ul>
   `;
 }
@@ -1234,11 +1237,11 @@ async function loadForum() {
     });
   }
 }
-
 // ==============================================================================
 // 9. EVENT LISTENERS
 // ==============================================================================
 function setupEventListeners() {
+  // Centrowanie mapy na Dom
   const btnHome = document.getElementById("btnCenterHome");
   if (btnHome) {
     btnHome.onclick = () => {
@@ -1250,15 +1253,30 @@ function setupEventListeners() {
     };
   }
 
+  // Obsługa kalkulatora biletów
   ["calcNormal", "calcReduced", "calcCurrency"].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.addEventListener("input", przeliczBilety);
   });
 
+  // Obsługa Kantoru
   const customToggle = document.getElementById("exCustomToggle");
   const customRateContainer = document.getElementById("exCustomRateContainer");
   const customRateInput = document.getElementById("exCustomRateInput");
   const customRateLabel = document.getElementById("exCustomRateLabel");
+
+  const updateCustomLabel = () => {
+    const from = document.getElementById("exFrom").value;
+    const to = document.getElementById("exTo").value;
+    if (customRateLabel) {
+      customRateLabel.innerText = `Własny kurs (1 ${from} = ? ${to}):`;
+    }
+    if (customToggle && customToggle.checked && customRateInput) {
+      const defaultRate = bazaKursow[`${from}_${to}`] || 1.0;
+      customRateInput.value = defaultRate.toFixed(4);
+    }
+    przeliczKantor();
+  };
 
   if (customToggle) {
     customToggle.onchange = () => {
@@ -1280,18 +1298,23 @@ function setupEventListeners() {
     };
   }
 
-  const updateCustomLabel = () => {
-    const from = document.getElementById("exFrom").value;
-    const to = document.getElementById("exTo").value;
-    if (customRateLabel) {
-      customRateLabel.innerText = `Własny kurs (1 ${from} = ? ${to}):`;
-    }
-    if (customToggle && customToggle.checked && customRateInput) {
-      const defaultRate = bazaKursow[`${from}_${to}`] || 1.0;
-      customRateInput.value = defaultRate.toFixed(4);
-    }
-    przeliczKantor();
-  };
+  // Kliknięcie strzałek zamiany walut (⇄)
+  const btnSwap = document.getElementById("btnSwapCurrencies");
+  if (btnSwap) {
+    btnSwap.onclick = () => {
+      const elFrom = document.getElementById("exFrom");
+      const elTo = document.getElementById("exTo");
+      if (!elFrom || !elTo) return;
+
+      // Zamiana wartości w selectach
+      const temp = elFrom.value;
+      elFrom.value = elTo.value;
+      elTo.value = temp;
+
+      // Aktualizacja etykiet kursu i natychmiastowe przeliczenie
+      updateCustomLabel();
+    };
+  }
 
   ["exAmount", "exCustomRateInput"].forEach(id => {
     const el = document.getElementById(id);

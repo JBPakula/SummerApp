@@ -375,3 +375,27 @@ html, body {
   font-size: 11px !important;
   font-weight: 600;
 }
+
+/* Przycisk zamiany walut w kantorze */
+.btn-swap-currency {
+  background: transparent;
+  border: none;
+  color: var(--burgund);
+  font-size: 1.4rem;
+  padding: 0;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.btn-swap-currency:hover {
+  opacity: 0.8;
+  transform: scale(1.1);
+}
+
+.btn-swap-currency:active {
+  transform: rotate(180deg);
+}
