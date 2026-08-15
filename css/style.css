@@ -13,13 +13,13 @@
 }
 
 html, body {
-  height: 100%;
+  min-height: 100%;
   overflow-x: hidden;
   background-color: var(--tlo-jasne) !important;
   color: var(--tekst);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   margin: 0;
-  padding-bottom: 70px;
+  padding-bottom: 45px; /* Minimalny odstęp pod wysokość stopki */
 }
 
 /* Przyciski burgundowe */
@@ -46,10 +46,10 @@ html, body {
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   border-top: 1px solid #E5E5E5 !important;
-  padding: 8px 16px;
+  padding: 6px 16px;
   box-sizing: border-box;
   z-index: 9999;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
 }
 
 /* Logo w górnym pasku */
@@ -64,47 +64,13 @@ html, body {
 /* 0.2 PULPIT (DASHBOARD) */
 /* ============================================================================== */
 .dashboard-container {
-  position: relative;
-  min-height: calc(100vh - 120px);
   display: flex;
   flex-direction: column;
-  background-color: #FFFFFF;
-  border-radius: 16px;
-  padding-bottom: 20px;
-  overflow: hidden;
-}
-
-.dashboard-container > * {
-  position: relative;
-  z-index: 2;
-}
-
-.dashboard-container::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 520px;
-  background-image: 
-      linear-gradient(
-          to bottom,
-          #FFFFFF 0%,
-          rgba(255, 255, 255, 0.96) 6%,
-          rgba(255, 255, 255, 0.75) 16%,
-          rgba(255, 255, 255, 0.35) 28%,
-          rgba(255, 255, 255, 0) 45%
-      ),
-      url('../assets/landscape.webp');
-  background-size: 100% 100%, 100% auto;
-  background-position: center top, center bottom;
-  background-repeat: no-repeat, no-repeat;
-  z-index: 1;
-  pointer-events: none;
+  min-height: calc(100dvh - 95px); /* Rozciąga pulpit dokładnie do stopki (dvh dopasowuje się do ekranu telefonu) */
 }
 
 .dashboard-card {
-  background: rgba(255, 255, 255, 0.92) !important;
+  background: rgba(255, 255, 255, 0.95) !important;
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   border: 1px solid rgba(197, 188, 176, 0.8) !important;
@@ -121,27 +87,6 @@ html, body {
   border-color: var(--burgund) !important;
 }
 
-/* Krajobraz w tle z miękkim maskowaniem mgły nad wzgórzami */
-.dashboard-container::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 520px; /* Wysokość strefy zdjęcia — odsłania wzgórza */
-  background-image: url('../assets/landscape.webp');
-  background-size: cover;
-  background-position: center bottom;
-  background-repeat: no-repeat;
-  
-  /* Płynna maska przezroczystości od góry */
-  -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.6) 25%, rgba(0,0,0,1) 50%);
-  mask-image: linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.6) 25%, rgba(0,0,0,1) 50%);
-  
-  z-index: 1;
-  pointer-events: none;
-}
-
 .tile-title {
   color: var(--burgund);
   font-size: 0.95rem;
@@ -152,6 +97,27 @@ html, body {
   font-size: 0.72rem;
   margin-top: 2px;
   line-height: 1.1;
+}
+
+/* Kontener spychający krajobraz na sam dół */
+.dashboard-landscape-wrapper {
+  margin-top: auto; /* Kluczowe: automatycznie spycha grafikę na sam dół do stopki */
+  width: 100%;
+  padding-top: 10px;
+}
+
+/* Krajobraz: widać CAŁE zdjęcie (wzgórza + winorośla na dole) bez ucinania kadrów */
+.dashboard-landscape-img {
+  width: 100%;
+  height: auto; /* Kluczowe: zachowuje pełne proporcje i pokazuje cały kadr */
+  max-height: 380px;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto;
+  
+  /* Miękkie przejście mgły na samej górze nieba */
+  -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.85) 15%, rgba(0,0,0,1) 30%);
+  mask-image: linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.85) 15%, rgba(0,0,0,1) 30%);
 }
 
 /* ============================================================================== */
