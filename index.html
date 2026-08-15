@@ -16,7 +16,8 @@
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   
-  <!-- Cache-Buster CSS -->
+  <!-- Styl bazowy + Cache-Buster CSS -->
+  <link rel="stylesheet" href="css/style.css">
   <script>
     const cssLink = document.createElement('link');
     cssLink.rel = 'stylesheet';
@@ -32,7 +33,7 @@
   <div id="loginSection" class="container py-5" style="display: none; max-width: 420px;">
     <div class="card shadow-lg p-4 border-0 rounded-4 mt-4">
       <div class="text-center mb-3">
-        <img src="assets/logo.png" alt="Logo" class="img-fluid" style="max-height: 90px;" onerror="this.style.display='none'">
+        <img src="assets/logo.png" alt="Logo" class="img-fluid" style="max-height: 90px; object-fit: contain;" onerror="this.style.display='none'">
       </div>
       <h2 class="text-center fw-bold mb-4" style="color: var(--burgund);">Wakacje Stada</h2>
       <div class="mb-3">
@@ -53,49 +54,33 @@
   <!-- GŁÓWNY WIDOK APLIKACJI -->
   <!-- ============================================================================== -->
   <div id="appSection" style="display: none;">
-    <!-- Górny Pasek Nawigacyjny -->
-    <nav class="navbar navbar-light bg-light shadow-sm sticky-top px-3">
-      <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebarMenu">
-        <i class="bi bi-list fs-5"></i>
-      </button>
-      <span id="navTitle" class="navbar-brand mb-0 h1 fw-bold fs-6" style="color: var(--burgund); cursor: pointer;" onclick="switchTab('dashboard')">
-        - Wakacje Stada -
-      </span>
-      <button class="btn btn-outline-danger btn-sm" onclick="switchTab('dashboard')" title="Pulpit">
-        <i class="bi bi-grid-fill"></i>
+    <!-- Górny Pasek: Logo + Tytuł (kliknięcie = powrót do Pulpitu) i przycisk wylogowania -->
+    <nav class="navbar bg-white shadow-sm sticky-top px-3 py-2 border-bottom">
+      <div class="d-flex align-items-center" style="cursor: pointer;" onclick="switchTab('dashboard')" title="Przejdź do pulpitu">
+        <img src="assets/logo.png" alt="Logo" class="nav-app-logo me-2" style="height: 32px; width: 32px; object-fit: contain; mix-blend-mode: multiply;" onerror="this.style.display='none'">
+        <span id="navTitle" class="navbar-brand mb-0 h1 fw-bold fs-6" style="color: var(--burgund);">
+          Wakacje Stada
+        </span>
+      </div>
+      <button id="btnLogout" class="btn btn-sm btn-outline-secondary border-0 p-1" title="Wyloguj się">
+        <i class="bi bi-box-arrow-right fs-5 text-muted"></i>
       </button>
     </nav>
-
-    <!-- Menu Boczne (Offcanvas / Sidebar) -->
-    <div class="offcanvas offcanvas-start" tabindex="-1" id="sidebarMenu">
-      <div class="offcanvas-header border-bottom">
-        <h5 class="offcanvas-title fw-bold" style="color: var(--burgund);">Wakacje Stada</h5>
-        <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas"></button>
-      </div>
-      <div class="offcanvas-body">
-        <div class="profile-card">
-          <img id="userAvatar" src="" class="profile-avatar" alt="Avatar">
-          <h5 id="userNameDisplay" class="fw-bold mb-0">Użytkownik</h5>
-          <small class="text-muted">Ekipa: <b id="userTeamDisplay" style="color: var(--burgund);">Ekipa</b></small>
-        </div>
-        <div class="d-grid gap-2" id="navButtonsContainer">
-          <!-- Przyciski generowane dynamicznie w JS -->
-        </div>
-        <hr>
-        <button id="btnLogout" class="btn btn-outline-secondary w-100"><i class="bi bi-box-arrow-right"></i> Wyloguj się</button>
-      </div>
-    </div>
 
     <!-- Główny kontener widoków -->
     <main class="container my-2" style="max-width: 500px;">
       
       <!-- ========================================================================== -->
-      <!-- 0. PULPIT GŁÓWNY (LANDING PAGE - DOKŁADNA KOLEJNOŚĆ KAFELKÓW) -->
+      <!-- 0. PULPIT GŁÓWNY (LANDING PAGE) -->
       <!-- ========================================================================== -->
       <section id="tab-dashboard" class="app-tab dashboard-container">
-        <div class="text-center my-2">
-          <img src="assets/logo.png" alt="Logo" class="img-fluid dashboard-logo mb-1" onerror="this.style.display='none'">
-          <h5 class="fw-bold mb-0" style="color: var(--burgund);">Szia, <span id="welcomeUserName">Stado</span>!</h5>
+        <!-- Góra: Awatar + Powitanie z lewej, Data i odliczanie z prawej -->
+        <div class="d-flex justify-content-between align-items-center my-2 px-2">
+          <div class="d-flex align-items-center">
+            <img id="dashboardUserAvatar" src="" class="rounded-circle me-2" style="width: 42px; height: 42px; object-fit: cover; border: 2px solid var(--burgund); background-color: #F4F1EA;" alt="Avatar">
+            <h4 class="fw-bold mb-0" style="color: var(--burgund);">Szia, <span id="welcomeUserName">Stado</span>!</h4>
+          </div>
+          <div class="text-end" id="dashboardDateBox" style="color: #6c757d; font-size: 0.85rem; line-height: 1.2;"></div>
         </div>
 
         <!-- Siatka Kafelków (8 Modułów w parach) -->
@@ -104,16 +89,16 @@
           <div class="col-6">
             <div class="card dashboard-card shadow-sm h-100" onclick="switchTab('🗺️ Mapa')">
               <div class="card-body text-center py-2 px-1">
-                <div class="fw-bold tile-title">🗺️ Mapa</div>
-                <div class="tile-desc text-muted">Punkty i trasy</div>
+                <div class="fw-bold tile-title">Mapa</div>
+                <div class="tile-desc text-muted">DOM i atrakcje</div>
               </div>
             </div>
           </div>
           <div class="col-6">
             <div class="card dashboard-card shadow-sm h-100" onclick="switchTab('💬 Forum')">
               <div class="card-body text-center py-2 px-1">
-                <div class="fw-bold tile-title">💬 Forum</div>
-                <div class="tile-desc text-muted">Wątki i ustalenia</div>
+                <div class="fw-bold tile-title">Forum</div>
+                <div class="tile-desc text-muted">Let's talk!</div>
               </div>
             </div>
           </div>
@@ -122,15 +107,15 @@
           <div class="col-6">
             <div class="card dashboard-card shadow-sm h-100" onclick="switchTab('💰 Wydatki')">
               <div class="card-body text-center py-2 px-1">
-                <div class="fw-bold tile-title">💰 Wydatki</div>
-                <div class="tile-desc text-muted">Wpisywanie kwot</div>
+                <div class="fw-bold tile-title">Wydatki</div>
+                <div class="tile-desc text-muted">Podsumowanie kosztów</div>
               </div>
             </div>
           </div>
           <div class="col-6">
             <div class="card dashboard-card shadow-sm h-100" onclick="switchTab('🛒 Zakupy')">
               <div class="card-body text-center py-2 px-1">
-                <div class="fw-bold tile-title">🛒 Zakupy</div>
+                <div class="fw-bold tile-title">Zakupy</div>
                 <div class="tile-desc text-muted">Wspólne listy</div>
               </div>
             </div>
@@ -140,7 +125,7 @@
           <div class="col-6">
             <div class="card dashboard-card shadow-sm h-100" onclick="switchTab('💱 Kantor')">
               <div class="card-body text-center py-2 px-1">
-                <div class="fw-bold tile-title">💱 Kantor</div>
+                <div class="fw-bold tile-title">Kantor</div>
                 <div class="tile-desc text-muted">HUF / PLN / EUR</div>
               </div>
             </div>
@@ -148,17 +133,17 @@
           <div class="col-6">
             <div class="card dashboard-card shadow-sm h-100" onclick="switchTab('🏦 Portfel')">
               <div class="card-body text-center py-2 px-1">
-                <div class="fw-bold tile-title">🏦 Portfel</div>
-                <div class="tile-desc text-muted">Kto komu ile wisi</div>
+                <div class="fw-bold tile-title">Portfel</div>
+                <div class="tile-desc text-muted">Kto komu ile</div>
               </div>
             </div>
           </div>
 
-          <!-- Rząd 4: Razem za bilety (7) & Rozgrywki (8) -->
+          <!-- Rząd 4: Płacimy Razem (7) & Rozgrywki (8) -->
           <div class="col-6">
-            <div class="card dashboard-card shadow-sm h-100" onclick="switchTab('📊 Razem za bilety')">
+            <div class="card dashboard-card shadow-sm h-100" onclick="switchTab('📊 Płacimy Razem')">
               <div class="card-body text-center py-2 px-1">
-                <div class="fw-bold tile-title">📊 Razem za bilety</div>
+                <div class="fw-bold tile-title">Płacimy Razem</div>
                 <div class="tile-desc text-muted">Kalkulator biletów</div>
               </div>
             </div>
@@ -166,8 +151,8 @@
           <div class="col-6">
             <div class="card dashboard-card shadow-sm h-100" onclick="switchTab('🎲 Rozgrywki')">
               <div class="card-body text-center py-2 px-1">
-                <div class="fw-bold tile-title">🎲 Rozgrywki</div>
-                <div class="tile-desc text-muted">Blokus, Remik</div>
+                <div class="fw-bold tile-title">Rozgrywki</div>
+                <div class="tile-desc text-muted">Gramy w planszówki!</div>
               </div>
             </div>
           </div>
@@ -181,7 +166,6 @@
         <div id="mapContainer" style="height: 360px; width: 100%; border-radius: 14px;" class="shadow-sm mb-3"></div>
         <button id="btnCenterHome" class="btn btn-outline-dark btn-sm w-100 mb-3">🏠 Centruj na: Ámbitus ház (Dom)</button>
 
-        <!-- Karta dodawania punktu -->
         <div id="addPlaceCard" class="card p-3 border-0 shadow-sm rounded-4 mb-3" style="display: none; background: #FFFFFF; border-left: 5px solid var(--burgund) !important;">
           <h6 class="fw-bold mb-2" style="color: var(--burgund);">📍 Dodaj nowy punkt</h6>
           <form id="formAddPlace">
@@ -205,7 +189,6 @@
           </form>
         </div>
 
-        <!-- Filtry i Szukajka -->
         <div class="mb-2">
           <input type="text" id="placeSearchInput" class="form-control form-control-sm rounded-pill mb-2" placeholder="🔍 Szukaj atrakcji...">
           <div class="d-flex gap-1 overflow-auto pb-1" id="categoryPills">
@@ -217,10 +200,8 @@
           </div>
         </div>
 
-        <!-- Spis atrakcji -->
         <div id="placesList" class="list-group shadow-sm rounded-3 mb-4"></div>
 
-        <!-- Wysuwany panel szczegółów (Bottom Sheet) -->
         <div class="offcanvas offcanvas-bottom rounded-top-4" tabindex="-1" id="placeDetailsSheet" style="height: auto; max-height: 85vh;">
           <div class="offcanvas-header border-bottom py-2">
             <h6 class="offcanvas-title fw-bold" id="sheetPlaceTitle" style="color: var(--burgund);">Szczegóły miejsca</h6>
@@ -234,14 +215,12 @@
       <!-- 2. MODUŁ: FORUM DYSKUSYJNE -->
       <!-- ========================================================================== -->
       <section id="tab-forum" class="app-tab" style="display: none;">
-        <!-- Widok listy wątków -->
         <div id="forumTopicsView">
           <div class="d-flex align-items-center justify-content-between mb-3">
             <h4 class="fw-bold mb-0">💬 Forum</h4>
             <button class="btn btn-sm btn-outline-secondary" onclick="switchTab('dashboard')"><i class="bi bi-arrow-left"></i> Wróć</button>
           </div>
 
-          <!-- Zwijany formularz nowego wątku -->
           <div class="card border-0 shadow-sm rounded-4 mb-3" style="border-left: 5px solid var(--burgund) !important; background: #FFFFFF;">
             <div class="p-3 d-flex justify-content-between align-items-center" style="cursor: pointer;" onclick="toggleNewTopicForm()">
               <h6 class="fw-bold mb-0" style="color: var(--burgund);">➕ Załóż nowy wątek</h6>
@@ -268,13 +247,11 @@
             </div>
           </div>
 
-          <!-- Lista aktywnych wątków -->
           <div class="card p-3 border-0 shadow-sm rounded-4 mb-3">
             <h6 class="fw-bold mb-3" style="color: var(--burgund);">📑 Wątki dyskusyjne</h6>
             <div id="forumTopicsList" class="list-group list-group-flush"></div>
           </div>
 
-          <!-- Sekcja wątków archiwalnych -->
           <div class="card p-3 border-0 shadow-sm rounded-4 mb-4">
             <div class="d-flex justify-content-between align-items-center" style="cursor: pointer;" onclick="toggleArchivedTopics()">
               <h6 class="fw-bold mb-0 text-muted" style="font-size: 0.9rem;">📦 Wątki archiwalne</h6>
@@ -284,7 +261,6 @@
           </div>
         </div>
 
-        <!-- Widok pojedynczego wątku -->
         <div id="forumSingleTopicView" style="display: none;">
           <div class="d-flex align-items-center justify-content-between mb-3">
             <button class="btn btn-sm btn-outline-secondary" onclick="showTopicsList()"><i class="bi bi-arrow-left"></i> Wróć do wątków</button>
@@ -421,7 +397,6 @@
           🔒 Ta lista została zamknięta i rozliczona w Wydatkach.
         </div>
 
-        <!-- Modal finalizacji zakupów -->
         <div class="modal fade" id="modalFinishShopping" tabindex="-1">
           <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content rounded-4 border-0 shadow">
@@ -568,11 +543,11 @@
       </section>
 
       <!-- ========================================================================== -->
-      <!-- 7. MODUŁ: RAZEM ZA BILETY -->
+      <!-- 7. MODUŁ: PŁACIMY RAZEM -->
       <!-- ========================================================================== -->
       <section id="tab-calc" class="app-tab" style="display: none;">
         <div class="d-flex align-items-center justify-content-between mb-3">
-          <h4 class="fw-bold mb-0">📊 Razem za bilety</h4>
+          <h4 class="fw-bold mb-0">📊 Płacimy Razem</h4>
           <button class="btn btn-sm btn-outline-secondary" onclick="switchTab('dashboard')"><i class="bi bi-arrow-left"></i> Wróć</button>
         </div>
         <div class="card p-3 border-0 shadow-sm rounded-4">
@@ -584,11 +559,15 @@
           </div>
           <div class="mb-2">
             <label class="small fw-bold">Cena biletu normalnego:</label>
-            <input type="number" id="calcNormal" class="form-control form-control-sm" value="0">
+            <input type="number" id="calcNormal" class="form-control form-control-sm" value="0"
+                   onfocus="if(this.value==='0') this.value='';" 
+                   onblur="if(this.value==='') this.value='0';">
           </div>
           <div class="mb-3">
             <label class="small fw-bold">Cena biletu ulgowego:</label>
-            <input type="number" id="calcReduced" class="form-control form-control-sm" value="0">
+            <input type="number" id="calcReduced" class="form-control form-control-sm" value="0"
+                   onfocus="if(this.value==='0') this.value='';" 
+                   onblur="if(this.value==='') this.value='0';">
           </div>
           <div id="calcResults" class="p-3 bg-light rounded-3"></div>
         </div>
@@ -683,7 +662,7 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <!-- Dynamiczne wstrzyknięcie skryptu aplikacji (dokładnie raz) -->
+  <!-- Skrypt aplikacji -->
   <script>
     const appScript = document.createElement('script');
     appScript.src = 'js/app.js?t=' + Date.now();

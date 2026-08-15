@@ -52,28 +52,12 @@ html, body {
   font-size: 0.8rem;
 }
 
-/* ============================================================================== */
-/* 0.1 NAWIGACJA I SIDEBAR */
-/* ============================================================================== */
-.profile-card {
-  background-color: #FFFFFF;
-  border: 1px solid var(--ramka);
-  border-radius: 14px;
-  padding: 16px;
-  text-align: center;
-  margin-bottom: 15px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
-}
-
-.profile-avatar {
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  object-fit: cover;
-  margin-bottom: 8px;
-  border: 2px solid var(--burgund);
-  background-color: var(--tlo-jasne);
-  display: inline-block;
+/* Logo w górnym pasku */
+.nav-app-logo {
+  height: 32px;
+  width: auto;
+  object-fit: contain;
+  mix-blend-mode: multiply;
 }
 
 /* ============================================================================== */
@@ -101,14 +85,15 @@ html, body {
   left: 0;
   right: 0;
   bottom: 0;
-  height: 280px;
+  height: 520px;
   background-image: 
       linear-gradient(
           to bottom,
           #FFFFFF 0%,
-          rgba(255, 255, 255, 0.85) 15%,
-          rgba(255, 255, 255, 0.3) 35%,
-          rgba(255, 255, 255, 0) 60%
+          rgba(255, 255, 255, 0.96) 6%,
+          rgba(255, 255, 255, 0.75) 16%,
+          rgba(255, 255, 255, 0.35) 28%,
+          rgba(255, 255, 255, 0) 45%
       ),
       url('../assets/landscape.webp');
   background-size: 100% 100%, 100% auto;
@@ -116,11 +101,6 @@ html, body {
   background-repeat: no-repeat, no-repeat;
   z-index: 1;
   pointer-events: none;
-}
-
-.dashboard-logo {
-  max-height: 55px;
-  object-fit: contain;
 }
 
 .dashboard-card {
@@ -139,6 +119,27 @@ html, body {
   transform: scale(0.97);
   background-color: #FFFFFF !important;
   border-color: var(--burgund) !important;
+}
+
+/* Krajobraz w tle z miękkim maskowaniem mgły nad wzgórzami */
+.dashboard-container::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 520px; /* Wysokość strefy zdjęcia — odsłania wzgórza */
+  background-image: url('../assets/landscape.webp');
+  background-size: cover;
+  background-position: center bottom;
+  background-repeat: no-repeat;
+  
+  /* Płynna maska przezroczystości od góry */
+  -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.6) 25%, rgba(0,0,0,1) 50%);
+  mask-image: linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.6) 25%, rgba(0,0,0,1) 50%);
+  
+  z-index: 1;
+  pointer-events: none;
 }
 
 .tile-title {
@@ -387,10 +388,6 @@ html, body {
   font-size: 11px !important;
   font-weight: 600;
 }
-
-/* ============================================================================== */
-/* 7. MODUŁ: RAZEM ZA BILETY (Styl dziedziczony z kart bazowych) */
-/* ============================================================================== */
 
 /* ============================================================================== */
 /* 8. MODUŁ: ROZGRYWKI */

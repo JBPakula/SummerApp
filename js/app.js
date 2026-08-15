@@ -134,29 +134,33 @@ async function verifyAndLogin(userName, password) {
 
     document.getElementById("loginSection").style.display = "none";
     document.getElementById("appSection").style.display = "block";
-    document.getElementById("userNameDisplay").innerText = currentUser + " 👋";
-    document.getElementById("userTeamDisplay").innerText = currentTeam;
+    
     const welcomeEl = document.getElementById("welcomeUserName");
     if (welcomeEl) welcomeEl.innerText = currentUser;
 
-    const avatarEl = document.getElementById("userAvatar");
+    // Ładowanie awatara na pulpicie
+    const dashAvatarEl = document.getElementById("dashboardUserAvatar");
     const extensions = ["jpg", "jpeg", "png"];
     let extIndex = 0;
 
     function tryLoadAvatar() {
       if (extIndex < extensions.length) {
-        avatarEl.src = `assets/avatars/${currentUser}.${extensions[extIndex]}`;
+        const src = `assets/avatars/${currentUser}.${extensions[extIndex]}`;
+        if (dashAvatarEl) dashAvatarEl.src = src;
         extIndex++;
       } else {
-        avatarEl.onerror = null;
-        avatarEl.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser)}&background=8B0000&color=fff&size=128&bold=true`;
+        const fallbackUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser)}&background=8B0000&color=fff&size=128&bold=true`;
+        if (dashAvatarEl) {
+          dashAvatarEl.onerror = null;
+          dashAvatarEl.src = fallbackUrl;
+        }
       }
     }
 
-    avatarEl.onerror = tryLoadAvatar;
+    if (dashAvatarEl) dashAvatarEl.onerror = tryLoadAvatar;
     tryLoadAvatar();
 
-    renderNavigation();
+    renderDashboardDate();
     initMap();
     loadCosts();
 
@@ -199,31 +203,42 @@ document.getElementById("btnLogout").addEventListener("click", () => {
 });
 
 // ==============================================================================
-// 0.2 NAWIGACJA (SWITCHTAB)
+// 0.2 NAWIGACJA (SWITCHTAB) I WIDŻET PULPITU
 // ==============================================================================
-const ALL_TABS = [
-  "🏠 Pulpit",
-  "🗺️ Mapa", 
-  "💬 Forum", 
-  "💰 Wydatki", 
-  "🛒 Zakupy", 
-  "💱 Kantor", 
-  "🏦 Portfel", 
-  "📊 Razem za bilety", 
-  "🎲 Rozgrywki"
-];
+function renderDashboardDate() {
+  const container = document.getElementById("dashboardDateBox");
+  if (!container) return;
 
-function renderNavigation() {
-  const container = document.getElementById("navButtonsContainer");
-  container.innerHTML = "";
+  const now = new Date();
+  const day = now.getDate();
+  const months = [
+    "stycznia", "lutego", "marca", "kwietnia", "maja", "czerwca",
+    "lipca", "sierpnia", "września", "października", "listopada", "grudnia"
+  ];
+  const weekdays = [
+    "niedziela", "poniedziałek", "wtorek", "środa", "czwartek", "piątek", "sobota"
+  ];
 
-  ALL_TABS.forEach(tab => {
-    const btn = document.createElement("button");
-    btn.className = "btn btn-outline-danger text-start fw-bold mb-1";
-    btn.innerText = tab;
-    btn.onclick = () => switchTab(tab);
-    container.appendChild(btn);
-  });
+  const dateFormatted = `${day} ${months[now.getMonth()]}`;
+  const weekdayFormatted = weekdays[now.getDay()];
+
+  // Data wyjazdu: 19 sierpnia 2026
+  const targetDate = new Date(2026, 7, 19);
+  const todayOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const diffDays = Math.ceil((targetDate - todayOnly) / (1000 * 60 * 60 * 24));
+
+  let countdownHtml = "";
+  if (diffDays > 0) {
+    let textDni = "dni";
+    if (diffDays === 1) textDni = "dzień";
+    countdownHtml = `<div class="fw-bold" style="color: var(--burgund); font-size: 0.78rem;">⏳ ${diffDays} ${textDni} do wyjazdu</div>`;
+  }
+
+  container.innerHTML = `
+    <div class="fw-bold text-dark">${dateFormatted}</div>
+    <div class="text-muted small">${weekdayFormatted}</div>
+    ${countdownHtml}
+  `;
 }
 
 function switchTab(tabName) {
@@ -231,14 +246,9 @@ function switchTab(tabName) {
 
   document.querySelectorAll(".app-tab").forEach(el => el.style.display = "none");
 
-  const offcanvasEl = document.getElementById('sidebarMenu');
-  if (offcanvasEl && typeof bootstrap !== 'undefined') {
-    const offcanvas = bootstrap.Offcanvas.getInstance(offcanvasEl);
-    if (offcanvas) offcanvas.hide();
-  }
-
   if (tabName === "dashboard" || tabName.includes("Pulpit")) {
     document.getElementById("tab-dashboard").style.display = "block";
+    renderDashboardDate();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   } else if (tabName.includes("Mapa")) {
     document.getElementById("tab-map").style.display = "block";
@@ -975,9 +985,11 @@ async function loadCosts() {
       const card = document.createElement("div");
       card.className = c.is_private ? "stado-card-private" : "stado-card";
 
-      const createdTime = new Date(c.created_at).getTime();
-      const isUnderOneMinute = (now - createdTime) < 60000;
-      const canDelete = isUnderOneMinute && (c.created_by === currentUserId || c.paid_by === currentUser);
+      const diffSec = (now - new Date(c.created_at).getTime()) / 1000;
+      const isUnderOneMinute = diffSec <= 60;
+      const isAuthor = (c.created_by == currentUserId || (currentUser && c.paid_by && c.paid_by.toLowerCase() === currentUser.toLowerCase()));
+      const canDelete = isUnderOneMinute && isAuthor;
+      const remainingSec = Math.max(0, Math.round(60 - diffSec));
 
       card.innerHTML = `
         <div class="d-flex justify-content-between align-items-start">
@@ -990,7 +1002,7 @@ async function loadCosts() {
         ${c.comment ? `<div class="small fst-italic text-secondary mt-1">${c.comment}</div>` : ''}
         ${canDelete ? `
           <div class="text-end mt-2">
-            <button class="cost-delete-btn" onclick="window.usunWydatek(${c.id})">🗑️ Usuń (jeszcze przez chwilę)</button>
+            <button class="cost-delete-btn" onclick="window.usunWydatek(${c.id})">🗑️ Usuń (${remainingSec}s)</button>
           </div>
         ` : ''}
       `;
@@ -1369,10 +1381,10 @@ function renderCheatsheet(from, to, rate) {
   }
 
   let sampleAmounts = [];
-  if (from === "HUF") sampleAmounts = [500, 1000, 2000, 5000, 10000, 20000, 50000];
-  else if (from === "PLN") sampleAmounts = [10, 20, 50, 100, 200, 500, 1000];
-  else if (from === "EUR") sampleAmounts = [5, 10, 20, 50, 100, 200, 500];
-  else sampleAmounts = [1, 5, 10, 50, 100, 500];
+  if (from === "HUF") sampleAmounts = [1000, 2000, 5000, 10000, 20000];
+  else if (from === "PLN") sampleAmounts = [10, 20, 50, 100, 200];
+  else if (from === "EUR") sampleAmounts = [5, 10, 20, 50, 100];
+  else sampleAmounts = [1, 5, 10, 50, 100];
 
   tbody.innerHTML = sampleAmounts.map(amount => {
     const converted = amount * rate;
