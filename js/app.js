@@ -1,7 +1,7 @@
 // js/app.js
 
 // ==============================================================================
-// 1. KONFIGURACJA I POŁĄCZENIE Z BAZĄ
+// 0. KONFIGURACJA I ZMIENNE GLOBALNE
 // ==============================================================================
 const SUPABASE_URL = "https://mkysisoznxgssakcegbn.supabase.co";
 const SUPABASE_KEY = "sb_publishable_4lljAeNc5dvmsJG2u1-pgQ_zCnATIE1";
@@ -27,7 +27,7 @@ let malzenstwaMapa = {};
 let ekipyMapa = {};
 
 // ==============================================================================
-// 2. INICJALIZACJA I OBSŁUGA SESJI (LOCALSTORAGE & BAZA)
+// 0.1 INICJALIZACJA I OBSŁUGA SESJI
 // ==============================================================================
 async function initApp() {
   await pobierzKursyWalut();
@@ -35,12 +35,12 @@ async function initApp() {
   await checkAuth();
   setupEventListeners();
 
-  // Przywracanie ostatnio otwartej zakładki po odświeżeniu (lub Pulpit jako domyślny)
-  const lastTab = localStorage.getItem("active_tab") || "dashboard";
-  switchTab(lastTab);
+  if (currentUser) {
+    const lastTab = localStorage.getItem("active_tab") || "dashboard";
+    switchTab(lastTab);
+  }
 }
 
-// Bezpieczny start: odpala od razu, jeśli DOM jest już gotowy
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initApp);
 } else {
@@ -115,22 +115,12 @@ async function checkAuth() {
 
 async function verifyAndLogin(userName, password) {
   try {
-    console.log("Próba logowania dla:", userName.trim());
-
     const { data, error } = await supabaseClient.rpc("login_user", {
       p_login: userName.trim(),
       p_passcode: password.trim()
     });
 
-    console.log("Odpowiedź z bazy (RPC):", { data, error });
-
-    if (error) {
-      console.error("Błąd RPC z Supabase:", error.message, error.details);
-      return false;
-    }
-
-    if (!data || data.length === 0) {
-      console.warn("Brak pasującego rekordu dla podanych danych.");
+    if (error || !data || data.length === 0) {
       return false;
     }
 
@@ -147,11 +137,8 @@ async function verifyAndLogin(userName, password) {
     document.getElementById("userNameDisplay").innerText = currentUser + " 👋";
     document.getElementById("userTeamDisplay").innerText = currentTeam;
     const welcomeEl = document.getElementById("welcomeUserName");
-    if (welcomeEl) {
-      welcomeEl.innerText = currentUser;
-    }
+    if (welcomeEl) welcomeEl.innerText = currentUser;
 
-    // Inteligentne ładowanie awatara (obsługa .jpg, .jpeg, .png oraz fallback)
     const avatarEl = document.getElementById("userAvatar");
     const extensions = ["jpg", "jpeg", "png"];
     let extIndex = 0;
@@ -161,7 +148,6 @@ async function verifyAndLogin(userName, password) {
         avatarEl.src = `assets/avatars/${currentUser}.${extensions[extIndex]}`;
         extIndex++;
       } else {
-        // Fallback: jeśli żaden format nie istnieje
         avatarEl.onerror = null;
         avatarEl.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser)}&background=8B0000&color=fff&size=128&bold=true`;
       }
@@ -170,10 +156,10 @@ async function verifyAndLogin(userName, password) {
     avatarEl.onerror = tryLoadAvatar;
     tryLoadAvatar();
 
-renderNavigation();
+    renderNavigation();
     initMap();
     loadCosts();
-// Sprawdzamy, czy użytkownik ma zapisaną zakładkę – jeśli tak, przywracamy ją, w przeciwnym razie dashboard
+
     const savedTab = localStorage.getItem("active_tab") || "dashboard";
     switchTab(savedTab);
     return true;
@@ -213,18 +199,18 @@ document.getElementById("btnLogout").addEventListener("click", () => {
 });
 
 // ==============================================================================
-// 3. NAWIGACJA
+// 0.2 NAWIGACJA (SWITCHTAB)
 // ==============================================================================
 const ALL_TABS = [
   "🏠 Pulpit",
   "🗺️ Mapa", 
+  "💬 Forum", 
   "💰 Wydatki", 
-  "🏦 Portfel", 
   "🛒 Zakupy", 
-  "📊 Płacimy Razem", 
   "💱 Kantor", 
-  "🎲 Rozgrywki", 
-  "💬 Forum"
+  "🏦 Portfel", 
+  "📊 Razem za bilety", 
+  "🎲 Rozgrywki"
 ];
 
 function renderNavigation() {
@@ -239,58 +225,53 @@ function renderNavigation() {
     container.appendChild(btn);
   });
 }
+
 function switchTab(tabName) {
-  // Zapisz aktualną zakładkę w pamięci przeglądarki
   localStorage.setItem("active_tab", tabName);
 
-  // Ukryj wszystkie sekcje
   document.querySelectorAll(".app-tab").forEach(el => el.style.display = "none");
 
-  // Zamknij sidebar jeśli otwarty
   const offcanvasEl = document.getElementById('sidebarMenu');
   if (offcanvasEl && typeof bootstrap !== 'undefined') {
     const offcanvas = bootstrap.Offcanvas.getInstance(offcanvasEl);
     if (offcanvas) offcanvas.hide();
   }
 
- // Dopasowanie i pokazanie wybranej sekcji
   if (tabName === "dashboard" || tabName.includes("Pulpit")) {
     document.getElementById("tab-dashboard").style.display = "block";
     window.scrollTo({ top: 0, behavior: 'smooth' });
   } else if (tabName.includes("Mapa")) {
     document.getElementById("tab-map").style.display = "block";
-    if (mapInstance) {
-      setTimeout(() => mapInstance.invalidateSize(), 200);
-    }
+    if (mapInstance) setTimeout(() => mapInstance.invalidateSize(), 200);
+  } else if (tabName.includes("Forum")) {
+    document.getElementById("tab-forum").style.display = "block";
+    showTopicsList();
   } else if (tabName.includes("Wydatki")) {
     document.getElementById("tab-costs").style.display = "block";
     loadCosts();
-  } else if (tabName.includes("Portfel")) {
-    document.getElementById("tab-wallet").style.display = "block";
-    loadWallet();
   } else if (tabName.includes("Zakupy")) {
     document.getElementById("tab-shopping").style.display = "block";
     loadShoppingLists();
+  } else if (tabName.includes("Kantor")) {
+    document.getElementById("tab-exchange").style.display = "block";
+    przeliczKantor();
+  } else if (tabName.includes("Portfel")) {
+    document.getElementById("tab-wallet").style.display = "block";
+    loadWallet();
   } else if (tabName.includes("bilety") || tabName.includes("Bilety") || tabName.includes("Płacimy") || tabName === "calc") {
     const tabCalc = document.getElementById("tab-calc");
     if (tabCalc) {
       tabCalc.style.display = "block";
       przeliczBilety();
     }
-  } else if (tabName.includes("Kantor")) {
-    document.getElementById("tab-exchange").style.display = "block";
-    przeliczKantor();
   } else if (tabName.includes("Rozgrywki") || tabName === "games") {
     document.getElementById("tab-games").style.display = "block";
     loadGames();
-  } else if (tabName.includes("Forum")) {
-    document.getElementById("tab-forum").style.display = "block";
-    loadForum();
   }
 }
 
 // ==============================================================================
-// 4. MODUŁ: MAPA
+// 1. MODUŁ: MAPA
 // ==============================================================================
 let domMarker = null;
 let tempMarker = null;
@@ -304,13 +285,9 @@ function getCategoryPinIcon(category, number) {
   let pinClass = 'pin-inne';
   const cat = (category || '').toLowerCase();
   
-  if (cat.includes('term')) {
-    pinClass = 'pin-termy';
-  } else if (cat.includes('zwiedzanie') || cat.includes('zabytek') || cat.includes('atrakcj')) {
-    pinClass = 'pin-zwiedzanie';
-  } else if (cat.includes('jedzenie') || cat.includes('wino') || cat.includes('restaurac')) {
-    pinClass = 'pin-jedzenie';
-  }
+  if (cat.includes('term')) pinClass = 'pin-termy';
+  else if (cat.includes('zwiedzanie') || cat.includes('zabytek') || cat.includes('atrakcj')) pinClass = 'pin-zwiedzanie';
+  else if (cat.includes('jedzenie') || cat.includes('wino') || cat.includes('restaurac')) pinClass = 'pin-jedzenie';
 
   return L.divIcon({
     className: 'custom-pin-wrapper',
@@ -436,9 +413,7 @@ function setupFilterAndSearch() {
   const pills = document.querySelectorAll(".filter-pill");
   pills.forEach(pill => {
     pill.onclick = () => {
-      pills.forEach(p => {
-        p.className = "btn btn-sm btn-outline-secondary rounded-pill px-3 filter-pill";
-      });
+      pills.forEach(p => p.className = "btn btn-sm btn-outline-secondary rounded-pill px-3 filter-pill");
       pill.className = "btn btn-sm btn-burgund rounded-pill px-3 filter-pill active";
       activeCategoryFilter = pill.getAttribute("data-cat");
       renderPlacesList();
@@ -451,8 +426,6 @@ async function loadMapPlaces() {
   if (!data) return;
 
   allMapPlaces = data;
-
-  // Czyścimy stare markery przed narysowaniem
   Object.values(markersMap).forEach(m => mapInstance.removeLayer(m));
 
   allMapPlaces.forEach((p, index) => {
@@ -461,7 +434,6 @@ async function loadMapPlaces() {
       const icon = getCategoryPinIcon(p.category, pinNumber);
       const marker = L.marker([p.lat, p.lng], { icon: icon }).addTo(mapInstance);
 
-      // Miniaturka w dymku na mapie
       const popupHtml = `
         <div style="min-width: 170px; max-width: 220px;">
           ${p.photo ? `<img src="${p.photo}" class="map-popup-img" alt="Foto">` : ''}
@@ -488,7 +460,6 @@ function renderPlacesList() {
 
   const filtered = allMapPlaces.filter((p) => {
     const matchesSearch = !currentSearchPhrase || (p.name && p.name.toLowerCase().includes(currentSearchPhrase)) || (p.address && p.address.toLowerCase().includes(currentSearchPhrase));
-    
     let matchesCategory = true;
     const cat = (p.category || '').toLowerCase();
     if (activeCategoryFilter === 'termy') matchesCategory = cat.includes('term');
@@ -526,7 +497,6 @@ function renderPlacesList() {
   });
 }
 
-// Globalna funkcja otwierająca wysuwany panel (Bottom Sheet)
 window.pokazSzczegolyMiejsca = function(placeId) {
   const p = allMapPlaces.find(x => x.id === placeId);
   if (!p) return;
@@ -534,7 +504,6 @@ window.pokazSzczegolyMiejsca = function(placeId) {
   document.getElementById("sheetPlaceTitle").innerText = p.name;
   const body = document.getElementById("sheetPlaceBody");
 
-  // Formatowanie JSONB dla godzin i cennika
   let godzinyTekst = "";
   if (p.opening_hours) {
     godzinyTekst = typeof p.opening_hours === 'object' 
@@ -544,34 +513,20 @@ window.pokazSzczegolyMiejsca = function(placeId) {
 
   let cenyTekst = "";
   if (p.prices) {
-    cenyTekst = typeof p.prices === 'object'
+    cenyTekst = typeof p.prices === 'object' 
       ? Object.entries(p.prices).map(([k, v]) => `<b>${k}:</b> ${v}`).join('<br>')
       : p.prices;
   }
 
   body.innerHTML = `
     ${p.photo ? `<img src="${p.photo}" class="sheet-header-img" alt="${p.name}">` : ''}
-    
     <div class="mb-3">
       <span class="badge ${p.category && p.category.toLowerCase().includes('term') ? 'bg-primary' : 'bg-secondary'} mb-1">${p.category || 'Atrakcja'}</span>
       ${p.address ? `<div class="small text-muted">📍 ${p.address}</div>` : ''}
       ${p.distance_from_egerszalok ? `<div class="small fw-bold text-dark mt-1">🚗 Odległość z domu: ${p.distance_from_egerszalok} km</div>` : ''}
     </div>
-
-    ${godzinyTekst ? `
-      <div class="sheet-attr-box">
-        <div class="fw-bold text-dark mb-1">🕒 Godziny otwarcia:</div>
-        <div>${godzinyTekst}</div>
-      </div>
-    ` : ''}
-
-    ${cenyTekst ? `
-      <div class="sheet-attr-box">
-        <div class="fw-bold text-dark mb-1">🎟️ Ceny biletów:</div>
-        <div>${cenyTekst}</div>
-      </div>
-    ` : ''}
-
+    ${godzinyTekst ? `<div class="sheet-attr-box"><div class="fw-bold text-dark mb-1">🕒 Godziny otwarcia:</div><div>${godzinyTekst}</div></div>` : ''}
+    ${cenyTekst ? `<div class="sheet-attr-box"><div class="fw-bold text-dark mb-1">🎟️ Ceny biletów:</div><div>${cenyTekst}</div></div>` : ''}
     <div class="d-grid gap-2 mt-3">
       ${p.official_url ? `<a href="${p.official_url}" target="_blank" class="btn btn-outline-danger btn-sm">🌐 Strona oficjalna</a>` : ''}
       ${p.lat && p.lng ? `<a href="https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}" target="_blank" class="btn btn-burgund btn-sm">🧭 Nawiguj (Google Maps)</a>` : ''}
@@ -584,7 +539,399 @@ window.pokazSzczegolyMiejsca = function(placeId) {
 };
 
 // ==============================================================================
-// 5. MODUŁ: WYDATKI
+// 2. MODUŁ: FORUM DYSKUSYJNE
+// ==============================================================================
+let currentTopicId = null;
+let currentTopicIsArchived = false;
+let forumUsersMap = {};
+
+function renderAvatarHtml(login) {
+  if (!login) return `<span class="forum-avatar-placeholder me-2">👤</span>`;
+  const cleanLogin = login.trim();
+  const fallbackUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(cleanLogin)}&background=4A1525&color=fff&size=64`;
+
+  return `
+    <img src="assets/avatars/${cleanLogin}.jpg" 
+         class="forum-avatar me-2" 
+         alt="${cleanLogin}" 
+         onerror="if(this.src.endsWith('.jpg')){ this.src='assets/avatars/${cleanLogin}.jpeg'; } else if(this.src.endsWith('.jpeg')){ this.src='assets/avatars/${cleanLogin}.png'; } else { this.onerror=null; this.src='${fallbackUrl}'; }">
+  `;
+}
+
+function formatTopicDoc(cmd, value = null) {
+  document.execCommand(cmd, false, value);
+  const el = document.getElementById("newTopicFirstPost");
+  if (el) el.focus();
+}
+
+function formatReplyDoc(cmd, value = null) {
+  document.execCommand(cmd, false, value);
+  const el = document.getElementById("forumPostEditor");
+  if (el) el.focus();
+}
+
+async function pobierzUzytkownikowForum() {
+  if (Object.keys(forumUsersMap).length === 0) {
+    const { data: users } = await supabaseClient.from("users").select("id, login");
+    if (users) {
+      users.forEach(u => { forumUsersMap[u.id] = u.login; });
+    }
+  }
+}
+
+async function loadForum() {
+  await pobierzUzytkownikowForum();
+  const savedTopicId = localStorage.getItem("forum_active_topic_id");
+  if (savedTopicId) {
+    await openTopicById(parseInt(savedTopicId, 10));
+  } else {
+    showTopicsList();
+  }
+}
+
+function showTopicsList() {
+  currentTopicId = null;
+  localStorage.removeItem("forum_active_topic_id");
+
+  const formBox = document.getElementById("newTopicFormCollapse");
+  const icon = document.getElementById("iconNewTopicToggle");
+  if (formBox) formBox.style.display = "none";
+  if (icon) icon.className = "bi bi-chevron-down text-muted";
+
+  const v1 = document.getElementById("forumTopicsView");
+  const v2 = document.getElementById("forumSingleTopicView");
+  if (v1 && v2) {
+    v1.style.display = "block";
+    v2.style.display = "none";
+  }
+  loadTopics();
+}
+
+window.toggleNewTopicForm = function() {
+  const formBox = document.getElementById("newTopicFormCollapse");
+  const icon = document.getElementById("iconNewTopicToggle");
+  if (!formBox) return;
+
+  const isHidden = formBox.style.display === "none";
+  formBox.style.display = isHidden ? "block" : "none";
+  if (icon) {
+    icon.className = isHidden ? "bi bi-chevron-up text-muted" : "bi bi-chevron-down text-muted";
+  }
+};
+
+window.toggleArchivedTopics = function() {
+  const list = document.getElementById("forumArchivedTopicsList");
+  const icon = document.getElementById("iconArchivedToggle");
+  if (!list) return;
+  const isHidden = list.style.display === "none";
+  list.style.display = isHidden ? "block" : "none";
+  if (icon) icon.className = isHidden ? "bi bi-chevron-up text-muted" : "bi bi-chevron-down text-muted";
+};
+
+async function loadTopics() {
+  const activeContainer = document.getElementById("forumTopicsList");
+  const archivedContainer = document.getElementById("forumArchivedTopicsList");
+  if (!activeContainer || !archivedContainer) return;
+
+  activeContainer.innerHTML = "<div class='text-muted small py-2'>Ładowanie wątków...</div>";
+  archivedContainer.innerHTML = "<div class='text-muted small py-2'>Ładowanie archiwum...</div>";
+
+  await pobierzUzytkownikowForum();
+
+  const { data: topics, error } = await supabaseClient
+    .from("forum_topics")
+    .select("*")
+    .eq("deleted", false)
+    .order("created_at", { ascending: false });
+
+  if (error || !topics) {
+    activeContainer.innerHTML = `<div class='text-danger small py-2'>Błąd: ${error ? error.message : ''}</div>`;
+    return;
+  }
+
+  const { data: allPosts } = await supabaseClient.from("forum").select("topic_id").eq("deleted", false);
+
+  const activeTopics = topics.filter(t => !t.is_archived);
+  const archivedTopics = topics.filter(t => t.is_archived);
+
+  if (activeTopics.length === 0) {
+    activeContainer.innerHTML = "<div class='text-muted small py-2'>Brak aktywnych wątków. Załóż temat powyżej!</div>";
+  } else {
+    activeContainer.innerHTML = activeTopics.map(t => renderSingleTopicItem(t, allPosts, false)).join("");
+  }
+
+  if (archivedTopics.length === 0) {
+    archivedContainer.innerHTML = "<div class='text-muted small py-2'>Brak zarchiwizowanych wątków.</div>";
+  } else {
+    archivedContainer.innerHTML = archivedTopics.map(t => renderSingleTopicItem(t, allPosts, true)).join("");
+  }
+}
+
+function renderSingleTopicItem(t, allPosts, isArchived) {
+  const author = forumUsersMap[t.created_by] || "Uczestnik";
+  const avatar = renderAvatarHtml(author);
+  const count = allPosts ? allPosts.filter(p => p.topic_id === t.id).length : 0;
+  const dateObj = new Date(t.created_at);
+  const date = dateObj.toLocaleString("pl-PL", {
+    day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit"
+  });
+  
+  const diffSec = (new Date() - dateObj) / 1000;
+  const isAuthor = (t.created_by == currentUserId || (currentUser && author.toLowerCase() === currentUser.toLowerCase()));
+
+  let actionBtnHtml = "";
+  if (isAuthor) {
+    if (diffSec <= 60 && !isArchived) {
+      actionBtnHtml = `
+        <button class="btn btn-sm btn-outline-danger py-0 px-2 mt-1" 
+                style="font-size: 11px; white-space: nowrap;" 
+                onclick="event.stopPropagation(); deleteTopic(${t.id})">
+          🗑️ Usuń (${Math.max(0, Math.round(60 - diffSec))}s)
+        </button>
+      `;
+    } else if (!isArchived) {
+      actionBtnHtml = `
+        <button class="btn btn-sm btn-outline-secondary py-0 px-2 mt-1" 
+                style="font-size: 11px; white-space: nowrap;" 
+                onclick="event.stopPropagation(); archiveTopic(${t.id}, true)">
+          📦 Archiwizuj
+        </button>
+      `;
+    } else {
+      actionBtnHtml = `
+        <button class="btn btn-sm btn-outline-success py-0 px-2 mt-1" 
+                style="font-size: 11px; white-space: nowrap;" 
+                onclick="event.stopPropagation(); archiveTopic(${t.id}, false)">
+          🔄 Przywróć
+        </button>
+      `;
+    }
+  }
+
+  return `
+    <div class="forum-topic-item border-bottom mb-2 p-2 ${isArchived ? 'bg-light opacity-75' : ''}" onclick="openTopicById(${t.id})" style="cursor: pointer;">
+      <div class="d-flex justify-content-between align-items-start">
+        <div class="pe-2">
+          <div class="fw-bold" style="color: var(--burgund); font-size: 1rem; word-break: break-word;">${t.title}</div>
+          <div class="small text-muted mt-2 d-flex align-items-center">
+            ${avatar}
+            <span><b>${author}</b> &bull; ${date}</span>
+          </div>
+        </div>
+        <div class="d-flex flex-column align-items-end flex-shrink-0 ms-2">
+          <span class="badge bg-light text-dark border">💬 ${count}</span>
+          ${actionBtnHtml}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+const btnCreateTopic = document.getElementById("btnCreateTopic");
+if (btnCreateTopic) {
+  btnCreateTopic.onclick = async () => {
+    const titleInput = document.getElementById("newTopicTitle");
+    const firstPostInput = document.getElementById("newTopicFirstPost");
+    const title = titleInput.value.trim();
+    const firstPostContent = firstPostInput.innerHTML.trim();
+
+    if (!title || !firstPostContent || firstPostContent === "<br>") {
+      alert("Wpisz tytuł i treść pierwszej wiadomości!");
+      return;
+    }
+
+    btnCreateTopic.disabled = true;
+
+    const { data: topicData, error } = await supabaseClient
+      .from("forum_topics")
+      .insert({
+        title: title,
+        created_by: currentUserId,
+        is_archived: false,
+        deleted: false
+      })
+      .select().single();
+
+    if (!error && topicData) {
+      await supabaseClient.from("forum").insert({
+        topic_id: topicData.id,
+        comment: firstPostContent,
+        created_by: currentUserId,
+        deleted: false
+      });
+
+      titleInput.value = "";
+      firstPostInput.innerHTML = "";
+      btnCreateTopic.disabled = false;
+      openTopicById(topicData.id);
+    } else {
+      btnCreateTopic.disabled = false;
+      alert("Błąd podczas tworzenia wątku.");
+    }
+  };
+}
+
+async function openTopicById(topicId) {
+  currentTopicId = parseInt(topicId, 10);
+  localStorage.setItem("forum_active_topic_id", currentTopicId);
+
+  await pobierzUzytkownikowForum();
+
+  const { data: topic, error } = await supabaseClient
+    .from("forum_topics")
+    .select("*")
+    .eq("id", currentTopicId)
+    .single();
+
+  if (error || !topic || topic.deleted) {
+    showTopicsList();
+    return;
+  }
+
+  currentTopicIsArchived = topic.is_archived;
+
+  document.getElementById("forumTopicsView").style.display = "none";
+  document.getElementById("forumSingleTopicView").style.display = "block";
+
+  const titleEl = document.getElementById("activeTopicTitle");
+  if (titleEl) {
+    const diffSec = (new Date() - new Date(topic.created_at)) / 1000;
+    const author = forumUsersMap[topic.created_by] || "";
+    const isAuthor = (topic.created_by == currentUserId || (currentUser && author.toLowerCase() === currentUser.toLowerCase()));
+
+    let headerAction = "";
+    if (isAuthor) {
+      if (diffSec <= 60 && !topic.is_archived) {
+        headerAction = `<button class="btn btn-sm btn-outline-danger py-0 px-2 ms-2" style="font-size: 11px;" onclick="deleteTopic(${topic.id})">🗑️ Usuń wątek</button>`;
+      } else if (!topic.is_archived) {
+        headerAction = `<button class="btn btn-sm btn-outline-secondary py-0 px-2 ms-2" style="font-size: 11px;" onclick="archiveTopic(${topic.id}, true)">📦 Archiwizuj wątek</button>`;
+      } else {
+        headerAction = `<button class="btn btn-sm btn-outline-success py-0 px-2 ms-2" style="font-size: 11px;" onclick="archiveTopic(${topic.id}, false)">🔄 Przywróć wątek</button>`;
+      }
+    }
+
+    titleEl.innerHTML = `
+      <span>${topic.title}</span>
+      ${topic.is_archived ? ' <span class="badge bg-secondary ms-1">Archiwum</span>' : ''}
+      ${headerAction}
+    `;
+  }
+
+  const editorCard = document.getElementById("forumPostEditor")?.closest(".card");
+  if (editorCard) editorCard.style.display = topic.is_archived ? "none" : "block";
+
+  const editor = document.getElementById("forumPostEditor");
+  if (editor) editor.innerHTML = "";
+
+  await loadPosts(currentTopicId);
+}
+
+async function loadPosts(topicId) {
+  const container = document.getElementById("forumPostsList");
+  if (!container) return;
+
+  const parsedId = parseInt(topicId, 10);
+  container.innerHTML = "<div class='text-muted small py-2'>Ładowanie odpowiedzi...</div>";
+
+  await pobierzUzytkownikowForum();
+
+  const { data: posts, error } = await supabaseClient
+    .from("forum")
+    .select("id, comment, created_at, created_by")
+    .eq("topic_id", parsedId)
+    .eq("deleted", false)
+    .order("created_at", { ascending: true });
+
+  if (error || !posts || posts.length === 0) {
+    container.innerHTML = "<div class='text-muted small py-3 text-center'>Brak odpowiedzi w tym wątku.</div>";
+    return;
+  }
+
+  container.innerHTML = posts.map(p => {
+    const author = forumUsersMap[p.created_by] || "Uczestnik";
+    const avatar = renderAvatarHtml(author);
+    const dateObj = new Date(p.created_at);
+    const date = dateObj.toLocaleString("pl-PL", {
+      day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit"
+    });
+
+    const diffSec = (new Date() - dateObj) / 1000;
+    const isAuthor = (p.created_by == currentUserId || (currentUser && author.toLowerCase() === currentUser.toLowerCase()));
+
+    let deleteBtn = "";
+    if (isAuthor && diffSec <= 60 && !currentTopicIsArchived) {
+      deleteBtn = `<button class="btn btn-sm btn-outline-danger py-0 px-1 ms-2" style="font-size: 10px;" onclick="deletePost(${p.id})">🗑️ Usuń (${Math.max(0, Math.round(60 - diffSec))}s)</button>`;
+    }
+
+    return `
+      <div class="forum-post-card shadow-sm mb-3 p-3 bg-white rounded-3 border">
+        <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-2">
+          <div class="d-flex align-items-center">
+            ${avatar}
+            <b style="color: var(--burgund); font-size: 0.95rem;">${author}</b>
+          </div>
+          <div class="d-flex align-items-center">
+            <span class="text-muted small" style="font-size: 11px;">${date}</span>
+            ${deleteBtn}
+          </div>
+        </div>
+        <div class="forum-post-body" style="font-size: 0.92rem; line-height: 1.5;">
+          ${p.comment}
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+const btnSendPost = document.getElementById("btnSendPost");
+if (btnSendPost) {
+  btnSendPost.onclick = async () => {
+    const editor = document.getElementById("forumPostEditor");
+    const content = editor.innerHTML.trim();
+    if (!content || content === "<br>" || !currentTopicId) return;
+
+    btnSendPost.disabled = true;
+    const { error } = await supabaseClient.from("forum").insert({
+      topic_id: parseInt(currentTopicId, 10),
+      comment: content,
+      created_by: currentUserId,
+      deleted: false
+    });
+
+    btnSendPost.disabled = false;
+    if (!error) {
+      editor.innerHTML = "";
+      await loadPosts(currentTopicId);
+      window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+    } else {
+      alert("Błąd publikacji: " + error.message);
+    }
+  };
+}
+
+window.deleteTopic = async function(topicId) {
+  if (!confirm("Czy na pewno chcesz usunąć ten wątek?")) return;
+  await supabaseClient.from("forum_topics").update({ deleted: true }).eq("id", parseInt(topicId, 10));
+  showTopicsList();
+};
+
+window.archiveTopic = async function(topicId, archive) {
+  const actionText = archive ? "zarchiwizować" : "przywrócić z archiwum";
+  if (!confirm(`Czy na pewno chcesz ${actionText} ten wątek?`)) return;
+
+  await supabaseClient.from("forum_topics").update({ is_archived: archive }).eq("id", parseInt(topicId, 10));
+  if (currentTopicId) openTopicById(topicId);
+  else loadTopics();
+};
+
+window.deletePost = async function(postId) {
+  if (!confirm("Czy na pewno chcesz usunąć tę wiadomość?")) return;
+  await supabaseClient.from("forum").update({ deleted: true }).eq("id", parseInt(postId, 10));
+  if (currentTopicId) loadPosts(currentTopicId);
+};
+
+// ==============================================================================
+// 3. MODUŁ: WYDATKI
 // ==============================================================================
 async function loadCosts() {
   const container = document.getElementById("costsList");
@@ -751,158 +1098,7 @@ if (formCost) {
 }
 
 // ==============================================================================
-// 6. MODUŁ: PORTFEL (SYNCHRONIZACJA DWUSTRONNA 1:1)
-// ==============================================================================
-async function loadWallet() {
-  const { data: listaW } = await supabaseClient
-    .from("costs")
-    .select("*")
-    .eq("deleted", false)
-    .eq("is_private", false);
-
-  const oweContainer = document.getElementById("walletOweList");
-  const dueContainer = document.getElementById("walletDueList");
-  const summaryEl = document.getElementById("walletTotalSummary");
-
-  if (!oweContainer || !dueContainer) return;
-
-  oweContainer.innerHTML = "";
-  dueContainer.innerHTML = "";
-
-  let razemHuf = 0.0;
-  const mamyOddac = [];
-  const ktosZalega = [];
-
-  const ALL_TEAMS = ["Bobry", "Pakuły", "Robaki", "Sileziny"];
-
-  if (listaW) {
-    listaW.forEach(w => {
-      const kwota = parseFloat(w.amount);
-      const wal = w.currency;
-      const ktoPlacil = w.paid_by;
-      const teamPlacacy = ekipyMapa[ktoPlacil] || ktoPlacil;
-      const dlaKogoStr = (w.borrower || "Całe Stado").trim();
-      const settledArray = Array.isArray(w.settled_by) ? w.settled_by : [];
-      const kursDoHuf = bazaKursow[`${wal}_HUF`] || (wal === "HUF" ? 1.0 : (wal === "PLN" ? 85.2 : 368.0));
-
-      // 1. SCENARIUSZ: CAŁE STADO (PODZIAŁ NA 4 EKIPY)
-      if (dlaKogoStr === "Całe Stado") {
-        const kwotaUlamka = kwota / 4.0;
-        const wartoscHuf = kwotaUlamka * kursDoHuf;
-
-        if (teamPlacacy !== currentTeam) {
-          // Nasza ekipa wisi płatnikowi 1/4
-          const czyRozliczone = settledArray.includes(currentTeam);
-          if (!czyRozliczone) razemHuf -= wartoscHuf;
-
-          mamyOddac.push(`
-            <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
-              <div>
-                <span class="wallet-badge-fraction">1/4</span> Dla: <b>${ktoPlacil} (${teamPlacacy})</b> za <i>${w.cost_name}</i>:
-                <b class="${czyRozliczone ? 'text-decoration-line-through text-muted' : 'text-danger'} d-block">${kwotaUlamka.toFixed(2)} ${wal}</b>
-              </div>
-              <button class="btn btn-sm ${czyRozliczone ? 'btn-settled-yes' : 'btn-settled-no'}" onclick="window.oznaczRozliczenie(${w.id}, '${currentTeam}', ${!czyRozliczone})">
-                ${czyRozliczone ? '✓ Rozliczono' : '✕ Do rozliczenia'}
-              </button>
-            </div>
-          `);
-        } else {
-          // My płaciliśmy za Całe Stado - pozostałe 3 ekipy wiszą po 1/4
-          ALL_TEAMS.forEach(ekipa => {
-            if (ekipa === currentTeam) return;
-            const czyRozliczone = settledArray.includes(ekipa);
-            if (!czyRozliczone) razemHuf += wartoscHuf;
-
-            ktosZalega.push(`
-              <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
-                <div>
-                  <span class="wallet-badge-fraction">1/4</span> <b>${ekipa}</b> za <i>${w.cost_name}</i>:
-                  <b class="${czyRozliczone ? 'text-decoration-line-through text-muted' : 'text-success'} d-block">${kwotaUlamka.toFixed(2)} ${wal}</b>
-                </div>
-                <button class="btn btn-sm ${czyRozliczone ? 'btn-settled-yes' : 'btn-settled-no'}" onclick="window.oznaczRozliczenie(${w.id}, '${ekipa}', ${!czyRozliczone})">
-                  ${czyRozliczone ? '✓ Rozliczono' : '✕ Do rozliczenia'}
-                </button>
-              </div>
-            `);
-          });
-        }
-      } 
-      // 2. SCENARIUSZ: WYBRANE EKIPY LUB OSOBY
-      else {
-        const targets = dlaKogoStr.split(",").map(s => s.trim());
-        const liczbaStron = targets.length + 1; // płatnik + wskazani dłużnicy
-        const kwotaUlamka = kwota / liczbaStron;
-        const fractionLabel = `1/${liczbaStron}`;
-        const wartoscHuf = kwotaUlamka * kursDoHuf;
-
-        targets.forEach(target => {
-          const teamTargetu = ekipyMapa[target] || target;
-          const czyToMyJestesmyDluznikiem = (target === currentUser || teamTargetu === currentTeam);
-          const czyToMyPlacilismy = (teamPlacacy === currentTeam || ktoPlacil === currentUser);
-
-          // Identyfikator relacji długu (zawsze nazwa wskazana w borrower)
-          const relacjaId = target;
-          const czyRozliczone = settledArray.includes(relacjaId) || settledArray.includes(teamTargetu) || settledArray.includes(target);
-
-          if (czyToMyJestesmyDluznikiem && !czyToMyPlacilismy) {
-            // My wisimy płatnikowi
-            if (!czyRozliczone) razemHuf -= wartoscHuf;
-
-            mamyOddac.push(`
-              <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
-                <div>
-                  <span class="wallet-badge-fraction">${fractionLabel}</span> Dla: <b>${ktoPlacil} (${teamPlacacy})</b> za <i>${w.cost_name}</i>:
-                  <b class="${czyRozliczone ? 'text-decoration-line-through text-muted' : 'text-danger'} d-block">${kwotaUlamka.toFixed(2)} ${wal}</b>
-                </div>
-                <button class="btn btn-sm ${czyRozliczone ? 'btn-settled-yes' : 'btn-settled-no'}" onclick="window.oznaczRozliczenie(${w.id}, '${relacjaId}', ${!czyRozliczone})">
-                  ${czyRozliczone ? '✓ Rozliczono' : '✕ Do rozliczenia'}
-                </button>
-              </div>
-            `);
-          } else if (czyToMyPlacilismy && !czyToMyJestesmyDluznikiem) {
-            // Ktoś wisi nam
-            if (!czyRozliczone) razemHuf += wartoscHuf;
-
-            ktosZalega.push(`
-              <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
-                <div>
-                  <span class="wallet-badge-fraction">${fractionLabel}</span> <b>${target}</b> za <i>${w.cost_name}</i>:
-                  <b class="${czyRozliczone ? 'text-decoration-line-through text-muted' : 'text-success'} d-block">${kwotaUlamka.toFixed(2)} ${wal}</b>
-                </div>
-                <button class="btn btn-sm ${czyRozliczone ? 'btn-settled-yes' : 'btn-settled-no'}" onclick="window.oznaczRozliczenie(${w.id}, '${relacjaId}', ${!czyRozliczone})">
-                  ${czyRozliczone ? '✓ Rozliczono' : '✕ Do rozliczenia'}
-                </button>
-              </div>
-            `);
-          }
-        });
-      }
-    });
-  }
-
-  oweContainer.innerHTML = mamyOddac.length ? mamyOddac.join("") : "<div class='text-muted small'>Czysto! Brak zaległości.</div>";
-  dueContainer.innerHTML = ktosZalega.length ? ktosZalega.join("") : "<div class='text-muted small'>Brak zaległości ze strony innych.</div>";
-
-  summaryEl.innerText = `${razemHuf >= 0 ? '+ ' : '- '}${Math.round(Math.abs(razemHuf)).toLocaleString('pl-PL')} HUF`;
-  summaryEl.style.color = razemHuf >= 0 ? "green" : "red";
-}
-
-window.oznaczRozliczenie = async function(costId, entityKey, markAsSettled) {
-  const { data } = await supabaseClient.from("costs").select("settled_by").eq("id", costId).single();
-  let currentSettled = (data && Array.isArray(data.settled_by)) ? [...data.settled_by] : [];
-
-  if (markAsSettled) {
-    if (!currentSettled.includes(entityKey)) currentSettled.push(entityKey);
-  } else {
-    currentSettled = currentSettled.filter(x => x !== entityKey);
-  }
-
-  await supabaseClient.from("costs").update({ settled_by: currentSettled }).eq("id", costId);
-  loadWallet();
-};
-
-// ==============================================================================
-// 7. MODUŁ: ZAKUPY (NUMERACJA OD 1, ENTER, BLOKADA NOWEJ LISTY)
+// 4. MODUŁ: ZAKUPY
 // ==============================================================================
 let currentActiveShoppingListId = null;
 
@@ -917,13 +1113,12 @@ async function loadShoppingLists() {
   const { data } = await supabaseClient
     .from("shoppinglists")
     .select("*")
-    .order("id", { ascending: true }); // Rosnąco dla naturalnej numeracji 1, 2, 3...
+    .order("id", { ascending: true });
 
   if (data && data.length > 0) {
     const hasUnclosed = data.some(l => !l.closed);
     if (btnNew) btnNew.style.display = hasUnclosed ? "none" : "block";
 
-    // Wyświetlamy najnowszą na górze selecta, ale z numerem sekwencyjnym
     const reversed = [...data].reverse();
     reversed.forEach((l) => {
       const seqIndex = data.indexOf(l) + 1;
@@ -1090,17 +1285,13 @@ if (formFinish) {
 
     if (isNaN(amount) || amount <= 0 || !currentActiveShoppingListId) return;
 
-    // 1. Zamknięcie listy
     await supabaseClient.from("shoppinglists").update({ closed: true }).eq("id", currentActiveShoppingListId);
 
     const select = document.getElementById("shoppingListSelect");
     const seqNum = select.options[select.selectedIndex].getAttribute("data-seq") || "1";
     const dataStr = new Date().toISOString().substring(0, 10);
-
-    // Przypadek graniczny: zakup tylko dla własnej ekipy -> wydatek prywatny
     const isOnlyForMyTeam = (borrower === currentTeam);
 
-    // 2. Wpis do costs
     await supabaseClient.from("costs").insert({
       created_by: currentUserId,
       paid_by: currentUser,
@@ -1124,7 +1315,259 @@ if (formFinish) {
 }
 
 // ==============================================================================
-// 7.5 MODUŁ: ROZGRYWKI
+// 5. MODUŁ: KANTOR
+// ==============================================================================
+window.setKantorAmount = function(val) {
+  const input = document.getElementById("exAmount");
+  if (input) {
+    input.value = val;
+    przeliczKantor();
+  }
+};
+
+function przeliczKantor() {
+  const amt = parseFloat(document.getElementById("exAmount").value) || 0;
+  const from = document.getElementById("exFrom").value;
+  const to = document.getElementById("exTo").value;
+  const customToggle = document.getElementById("exCustomToggle");
+  const isCustom = customToggle ? customToggle.checked : false;
+  const customRateInput = document.getElementById("exCustomRateInput");
+  
+  let rate = bazaKursow[`${from}_${to}`] || 1.0;
+  let rateLabelPrefix = "Kurs rynkowy (EBC)";
+
+  if (from === to) {
+    rate = 1.0;
+  } else if (isCustom) {
+    const customVal = parseFloat(customRateInput.value);
+    if (!isNaN(customVal) && customVal > 0) {
+      rate = customVal;
+      rateLabelPrefix = "Własny kurs";
+    }
+  }
+
+  const res = amt * rate;
+  const formattedRes = to === "HUF" 
+    ? Math.round(res).toLocaleString('pl-PL') 
+    : res.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  document.getElementById("exResult").innerHTML = `
+    <div class="small text-muted mb-1">${rateLabelPrefix}: 1 ${from} = ${rate.toFixed(4)} ${to}</div>
+    <div class="fs-4 fw-bold" style="color:var(--burgund);">${formattedRes} ${to}</div>
+  `;
+
+  renderCheatsheet(from, to, rate);
+}
+
+function renderCheatsheet(from, to, rate) {
+  const tbody = document.getElementById("cheatsheetBody");
+  const rateInfo = document.getElementById("cheatsheetRateInfo");
+  if (!tbody) return;
+
+  if (rateInfo) {
+    rateInfo.innerText = `1 ${from} = ${rate.toFixed(4)} ${to}`;
+  }
+
+  let sampleAmounts = [];
+  if (from === "HUF") sampleAmounts = [500, 1000, 2000, 5000, 10000, 20000, 50000];
+  else if (from === "PLN") sampleAmounts = [10, 20, 50, 100, 200, 500, 1000];
+  else if (from === "EUR") sampleAmounts = [5, 10, 20, 50, 100, 200, 500];
+  else sampleAmounts = [1, 5, 10, 50, 100, 500];
+
+  tbody.innerHTML = sampleAmounts.map(amount => {
+    const converted = amount * rate;
+    const formattedFrom = amount.toLocaleString('pl-PL');
+    const formattedTo = to === "HUF" 
+      ? Math.round(converted).toLocaleString('pl-PL') 
+      : converted.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    return `
+      <tr class="border-bottom">
+        <td class="fw-bold py-2" style="color: var(--burgund); width: 50%;">
+          ${formattedFrom} ${from}
+        </td>
+        <td class="text-end fw-bold py-2" style="width: 50%;">
+          = ${formattedTo} ${to}
+        </td>
+      </tr>
+    `;
+  }).join("");
+}
+
+// ==============================================================================
+// 6. MODUŁ: PORTFEL
+// ==============================================================================
+async function loadWallet() {
+  const { data: listaW } = await supabaseClient
+    .from("costs")
+    .select("*")
+    .eq("deleted", false)
+    .eq("is_private", false);
+
+  const oweContainer = document.getElementById("walletOweList");
+  const dueContainer = document.getElementById("walletDueList");
+  const summaryEl = document.getElementById("walletTotalSummary");
+
+  if (!oweContainer || !dueContainer) return;
+
+  oweContainer.innerHTML = "";
+  dueContainer.innerHTML = "";
+
+  let razemHuf = 0.0;
+  const mamyOddac = [];
+  const ktosZalega = [];
+  const ALL_TEAMS = ["Bobry", "Pakuły", "Robaki", "Sileziny"];
+
+  if (listaW) {
+    listaW.forEach(w => {
+      const kwota = parseFloat(w.amount);
+      const wal = w.currency;
+      const ktoPlacil = w.paid_by;
+      const teamPlacacy = ekipyMapa[ktoPlacil] || ktoPlacil;
+      const dlaKogoStr = (w.borrower || "Całe Stado").trim();
+      const settledArray = Array.isArray(w.settled_by) ? w.settled_by : [];
+      const kursDoHuf = bazaKursow[`${wal}_HUF`] || (wal === "HUF" ? 1.0 : (wal === "PLN" ? 85.2 : 368.0));
+
+      if (dlaKogoStr === "Całe Stado") {
+        const kwotaUlamka = kwota / 4.0;
+        const wartoscHuf = kwotaUlamka * kursDoHuf;
+
+        if (teamPlacacy !== currentTeam) {
+          const czyRozliczone = settledArray.includes(currentTeam);
+          if (!czyRozliczone) razemHuf -= wartoscHuf;
+
+          mamyOddac.push(`
+            <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+              <div>
+                <span class="wallet-badge-fraction">1/4</span> Dla: <b>${ktoPlacil} (${teamPlacacy})</b> za <i>${w.cost_name}</i>:
+                <b class="${czyRozliczone ? 'text-decoration-line-through text-muted' : 'text-danger'} d-block">${kwotaUlamka.toFixed(2)} ${wal}</b>
+              </div>
+              <button class="btn btn-sm ${czyRozliczone ? 'btn-settled-yes' : 'btn-settled-no'}" onclick="window.oznaczRozliczenie(${w.id}, '${currentTeam}', ${!czyRozliczone})">
+                ${czyRozliczone ? '✓ Rozliczono' : '✕ Do rozliczenia'}
+              </button>
+            </div>
+          `);
+        } else {
+          ALL_TEAMS.forEach(ekipa => {
+            if (ekipa === currentTeam) return;
+            const czyRozliczone = settledArray.includes(ekipa);
+            if (!czyRozliczone) razemHuf += wartoscHuf;
+
+            ktosZalega.push(`
+              <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                <div>
+                  <span class="wallet-badge-fraction">1/4</span> <b>${ekipa}</b> za <i>${w.cost_name}</i>:
+                  <b class="${czyRozliczone ? 'text-decoration-line-through text-muted' : 'text-success'} d-block">${kwotaUlamka.toFixed(2)} ${wal}</b>
+                </div>
+                <button class="btn btn-sm ${czyRozliczone ? 'btn-settled-yes' : 'btn-settled-no'}" onclick="window.oznaczRozliczenie(${w.id}, '${ekipa}', ${!czyRozliczone})">
+                  ${czyRozliczone ? '✓ Rozliczono' : '✕ Do rozliczenia'}
+                </button>
+              </div>
+            `);
+          });
+        }
+      } else {
+        const targets = dlaKogoStr.split(",").map(s => s.trim());
+        const liczbaStron = targets.length + 1;
+        const kwotaUlamka = kwota / liczbaStron;
+        const fractionLabel = `1/${liczbaStron}`;
+        const wartoscHuf = kwotaUlamka * kursDoHuf;
+
+        targets.forEach(target => {
+          const teamTargetu = ekipyMapa[target] || target;
+          const czyToMyJestesmyDluznikiem = (target === currentUser || teamTargetu === currentTeam);
+          const czyToMyPlacilismy = (teamPlacacy === currentTeam || ktoPlacil === currentUser);
+          const relacjaId = target;
+          const czyRozliczone = settledArray.includes(relacjaId) || settledArray.includes(teamTargetu) || settledArray.includes(target);
+
+          if (czyToMyJestesmyDluznikiem && !czyToMyPlacilismy) {
+            if (!czyRozliczone) razemHuf -= wartoscHuf;
+
+            mamyOddac.push(`
+              <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                <div>
+                  <span class="wallet-badge-fraction">${fractionLabel}</span> Dla: <b>${ktoPlacil} (${teamPlacacy})</b> za <i>${w.cost_name}</i>:
+                  <b class="${czyRozliczone ? 'text-decoration-line-through text-muted' : 'text-danger'} d-block">${kwotaUlamka.toFixed(2)} ${wal}</b>
+                </div>
+                <button class="btn btn-sm ${czyRozliczone ? 'btn-settled-yes' : 'btn-settled-no'}" onclick="window.oznaczRozliczenie(${w.id}, '${relacjaId}', ${!czyRozliczone})">
+                  ${czyRozliczone ? '✓ Rozliczono' : '✕ Do rozliczenia'}
+                </button>
+              </div>
+            `);
+          } else if (czyToMyPlacilismy && !czyToMyJestesmyDluznikiem) {
+            if (!czyRozliczone) razemHuf += wartoscHuf;
+
+            ktosZalega.push(`
+              <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                <div>
+                  <span class="wallet-badge-fraction">${fractionLabel}</span> <b>${target}</b> za <i>${w.cost_name}</i>:
+                  <b class="${czyRozliczone ? 'text-decoration-line-through text-muted' : 'text-success'} d-block">${kwotaUlamka.toFixed(2)} ${wal}</b>
+                </div>
+                <button class="btn btn-sm ${czyRozliczone ? 'btn-settled-yes' : 'btn-settled-no'}" onclick="window.oznaczRozliczenie(${w.id}, '${relacjaId}', ${!czyRozliczone})">
+                  ${czyRozliczone ? '✓ Rozliczono' : '✕ Do rozliczenia'}
+                </button>
+              </div>
+            `);
+          }
+        });
+      }
+    });
+  }
+
+  oweContainer.innerHTML = mamyOddac.length ? mamyOddac.join("") : "<div class='text-muted small'>Czysto! Brak zaległości.</div>";
+  dueContainer.innerHTML = ktosZalega.length ? ktosZalega.join("") : "<div class='text-muted small'>Brak zaległości ze strony innych.</div>";
+
+  summaryEl.innerText = `${razemHuf >= 0 ? '+ ' : '- '}${Math.round(Math.abs(razemHuf)).toLocaleString('pl-PL')} HUF`;
+  summaryEl.style.color = razemHuf >= 0 ? "green" : "red";
+}
+
+window.oznaczRozliczenie = async function(costId, entityKey, markAsSettled) {
+  const { data } = await supabaseClient.from("costs").select("settled_by").eq("id", costId).single();
+  let currentSettled = (data && Array.isArray(data.settled_by)) ? [...data.settled_by] : [];
+
+  if (markAsSettled) {
+    if (!currentSettled.includes(entityKey)) currentSettled.push(entityKey);
+  } else {
+    currentSettled = currentSettled.filter(x => x !== entityKey);
+  }
+
+  await supabaseClient.from("costs").update({ settled_by: currentSettled }).eq("id", costId);
+  loadWallet();
+};
+
+// ==============================================================================
+// 7. MODUŁ: RAZEM ZA BILETY
+// ==============================================================================
+function przeliczBilety() {
+  const cNorm = parseFloat(document.getElementById("calcNormal").value) || 0;
+  const cUlg = parseFloat(document.getElementById("calcReduced").value) || 0;
+  const wal = document.getElementById("calcCurrency").value;
+  const out = document.getElementById("calcResults");
+
+  let total, bKoszt, pKoszt, rKoszt, sKoszt;
+  if (cUlg === 0) {
+    total = 15 * cNorm;
+    bKoszt = 3 * cNorm;
+    pKoszt = rKoszt = sKoszt = 4 * cNorm;
+  } else {
+    total = 8 * cNorm + 7 * cUlg;
+    bKoszt = 2 * cNorm + 1 * cUlg;
+    pKoszt = rKoszt = sKoszt = 2 * cNorm + 2 * cUlg;
+  }
+
+  out.innerHTML = `
+    <h5 class="fw-bold" style="color:var(--burgund);">Razem: ${total.toFixed(2)} ${wal}</h5>
+    <ul class="list-unstyled small mb-0 mt-2">
+      <li>🐗 <b>Bobry (3 os.):</b> ${bKoszt.toFixed(2)} ${wal}</li>
+      <li>🐱 <b>Pakuły (4 os.):</b> ${pKoszt.toFixed(2)} ${wal}</li>
+      <li>🐛 <b>Robaki (4 os.):</b> ${rKoszt.toFixed(2)} ${wal}</li>
+      <li>🐿️ <b>Sileziny (4 os.):</b> ${sKoszt.toFixed(2)} ${wal}</li>
+    </ul>
+  `;
+}
+
+// ==============================================================================
+// 8. MODUŁ: ROZGRYWKI
 // ==============================================================================
 let activeGameId = null;
 let activeGamePlayers = [];
@@ -1166,7 +1609,6 @@ function setupGameCreationUI() {
   }
 }
 
-// 1. Sprawdzanie czy trwa już aktywna gra
 async function checkActiveGame() {
   const { data } = await supabaseClient
     .from("games")
@@ -1194,7 +1636,6 @@ async function checkActiveGame() {
   }
 }
 
-// 2. Rozpoczęcie nowej rozgrywki
 const btnStartGame = document.getElementById("btnStartGame");
 if (btnStartGame) {
   btnStartGame.onclick = async () => {
@@ -1211,11 +1652,9 @@ if (btnStartGame) {
     let gameName = selType;
     let lowScoreWins = false;
 
-    if (selType === "Blokus") {
-      lowScoreWins = true;
-    } else if (selType === "1000" || selType === "Remik" || selType === "Carcassonne") {
-      lowScoreWins = false;
-    } else if (selType === "Inna") {
+    if (selType === "Blokus") lowScoreWins = true;
+    else if (selType === "1000" || selType === "Remik" || selType === "Carcassonne") lowScoreWins = false;
+    else if (selType === "Inna") {
       const customName = document.getElementById("customGameNameInput").value.trim();
       gameName = customName || "Własna Gra";
       const customLowCb = document.getElementById("customLowScoreWins");
@@ -1249,7 +1688,6 @@ if (btnStartGame) {
   };
 }
 
-// 3. Renderowanie rund w aktywnej grze
 async function renderActiveGameRounds() {
   const { data: scores } = await supabaseClient
     .from("gamescores")
@@ -1263,7 +1701,6 @@ async function renderActiveGameRounds() {
   const maxRound = Math.max(...scores.map(s => s.round_number));
   currentRoundNumber = maxRound;
 
-  // Renderowanie ukończonych rund
   const compContainer = document.getElementById("completedRoundsList");
   compContainer.innerHTML = "";
 
@@ -1277,14 +1714,13 @@ async function renderActiveGameRounds() {
     compContainer.appendChild(row);
   }
 
-  // Renderowanie bieżącej rundy
   document.getElementById("currentRoundTitle").innerText = `Runda ${maxRound}`;
   const currentInputs = document.getElementById("currentRoundInputs");
   currentInputs.innerHTML = "";
 
   const currRoundScores = scores.filter(s => s.round_number === maxRound);
 
-activeGamePlayers.forEach(pName => {
+  activeGamePlayers.forEach(pName => {
     const pScore = currRoundScores.find(s => s.player_name === pName);
     const val = pScore ? pScore.points : 0;
 
@@ -1303,7 +1739,6 @@ activeGamePlayers.forEach(pName => {
   });
 }
 
-// 4. Zapis punktów i przejście do kolejnej rundy
 const btnNextRound = document.getElementById("btnNextRound");
 if (btnNextRound) {
   btnNextRound.onclick = async () => {
@@ -1332,7 +1767,6 @@ if (btnNextRound) {
   };
 }
 
-// 5. Zakończenie gry i wyliczenie podium
 const btnFinishGame = document.getElementById("btnFinishGame");
 if (btnFinishGame) {
   btnFinishGame.onclick = async () => {
@@ -1405,7 +1839,6 @@ if (btnNewGameReset) {
   };
 }
 
-// 6. Archiwum gier
 async function loadPastGames() {
   const container = document.getElementById("pastGamesList");
   if (!container) return;
@@ -1435,554 +1868,9 @@ async function loadPastGames() {
 }
 
 // ==============================================================================
-// 8. MODUŁ: PŁACIMY RAZEM, KANTOR I FORUM
-// ==============================================================================
-function przeliczBilety() {
-  const cNorm = parseFloat(document.getElementById("calcNormal").value) || 0;
-  const cUlg = parseFloat(document.getElementById("calcReduced").value) || 0;
-  const wal = document.getElementById("calcCurrency").value;
-  const out = document.getElementById("calcResults");
-
-  let total, bKoszt, pKoszt, rKoszt, sKoszt;
-  if (cUlg === 0) {
-    total = 15 * cNorm;
-    bKoszt = 3 * cNorm;
-    pKoszt = rKoszt = sKoszt = 4 * cNorm;
-  } else {
-    total = 8 * cNorm + 7 * cUlg;
-    bKoszt = 2 * cNorm + 1 * cUlg;
-    pKoszt = rKoszt = sKoszt = 2 * cNorm + 2 * cUlg;
-  }
-
-  out.innerHTML = `
-    <h5 class="fw-bold" style="color:var(--burgund);">Razem: ${total.toFixed(2)} ${wal}</h5>
-    <ul class="list-unstyled small mb-0 mt-2">
-      <li>🐗 <b>Bobry (3 os.):</b> ${bKoszt.toFixed(2)} ${wal}</li>
-      <li>🐱 <b>Pakuły (4 os.):</b> ${pKoszt.toFixed(2)} ${wal}</li>
-      <li>🐛 <b>Robaki (4 os.):</b> ${rKoszt.toFixed(2)} ${wal}</li>
-      <li>🐿️ <b>Sileziny (4 os.):</b> ${sKoszt.toFixed(2)} ${wal}</li>
-    </ul>
-  `;
-}
-
-window.setKantorAmount = function(val) {
-  const input = document.getElementById("exAmount");
-  if (input) {
-    input.value = val;
-    przeliczKantor();
-  }
-};
-
-function przeliczKantor() {
-  const amt = parseFloat(document.getElementById("exAmount").value) || 0;
-  const from = document.getElementById("exFrom").value;
-  const to = document.getElementById("exTo").value;
-  const customToggle = document.getElementById("exCustomToggle");
-  const isCustom = customToggle ? customToggle.checked : false;
-  const customRateInput = document.getElementById("exCustomRateInput");
-  
-  let rate = bazaKursow[`${from}_${to}`] || 1.0;
-  let rateLabelPrefix = "Kurs rynkowy (EBC)";
-
-  if (from === to) {
-    rate = 1.0;
-  } else if (isCustom) {
-    const customVal = parseFloat(customRateInput.value);
-    if (!isNaN(customVal) && customVal > 0) {
-      rate = customVal;
-      rateLabelPrefix = "Własny kurs";
-    }
-  }
-
-  const res = amt * rate;
-  const formattedRes = to === "HUF" 
-    ? Math.round(res).toLocaleString('pl-PL') 
-    : res.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-  document.getElementById("exResult").innerHTML = `
-    <div class="small text-muted mb-1">${rateLabelPrefix}: 1 ${from} = ${rate.toFixed(4)} ${to}</div>
-    <div class="fs-4 fw-bold" style="color:var(--burgund);">${formattedRes} ${to}</div>
-  `;
-
-  renderCheatsheet(from, to, rate);
-}
-
-function renderCheatsheet(from, to, rate) {
-  const tbody = document.getElementById("cheatsheetBody");
-  const rateInfo = document.getElementById("cheatsheetRateInfo");
-  if (!tbody) return;
-
-  if (rateInfo) {
-    rateInfo.innerText = `1 ${from} = ${rate.toFixed(4)} ${to}`;
-  }
-
-  let sampleAmounts = [];
-  if (from === "HUF") {
-    sampleAmounts = [500, 1000, 2000, 5000, 10000, 20000, 50000];
-  } else if (from === "PLN") {
-    sampleAmounts = [10, 20, 50, 100, 200, 500, 1000];
-  } else if (from === "EUR") {
-    sampleAmounts = [5, 10, 20, 50, 100, 200, 500];
-  } else {
-    sampleAmounts = [1, 5, 10, 50, 100, 500];
-  }
-
-  tbody.innerHTML = sampleAmounts.map(amount => {
-    const converted = amount * rate;
-    const formattedFrom = amount.toLocaleString('pl-PL');
-    const formattedTo = to === "HUF" 
-      ? Math.round(converted).toLocaleString('pl-PL') 
-      : converted.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-    return `
-      <tr class="border-bottom">
-        <td class="fw-bold py-2" style="color: var(--burgund); width: 50%;">
-          ${formattedFrom} ${from}
-        </td>
-        <td class="text-end fw-bold py-2" style="width: 50%;">
-          = ${formattedTo} ${to}
-        </td>
-      </tr>
-    `;
-  }).join("");
-}
-
-// ==============================================================================
-// 8. MODUŁ: FORUM DYSKUSYJNE (Z PAMIĘCIĄ SESJI I AKCJAMI W WĄTKU)
-// ==============================================================================
-let currentTopicId = null;
-let currentTopicIsArchived = false;
-let forumUsersMap = {};
-
-function renderAvatarHtml(login) {
-  if (!login) return `<span class="forum-avatar-placeholder me-2">👤</span>`;
-  const cleanLogin = login.trim();
-  const fallbackUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(cleanLogin)}&background=4A1525&color=fff&size=64`;
-
-  return `
-    <img src="assets/avatars/${cleanLogin}.jpg" 
-         class="forum-avatar me-2" 
-         alt="${cleanLogin}" 
-         onerror="if(this.src.endsWith('.jpg')){ this.src='assets/avatars/${cleanLogin}.jpeg'; } else if(this.src.endsWith('.jpeg')){ this.src='assets/avatars/${cleanLogin}.png'; } else { this.onerror=null; this.src='${fallbackUrl}'; }">
-  `;
-}
-
-function formatTopicDoc(cmd, value = null) {
-  document.execCommand(cmd, false, value);
-  const el = document.getElementById("newTopicFirstPost");
-  if (el) el.focus();
-}
-
-function formatReplyDoc(cmd, value = null) {
-  document.execCommand(cmd, false, value);
-  const el = document.getElementById("forumPostEditor");
-  if (el) el.focus();
-}
-
-async function pobierzUzytkownikowForum() {
-  if (Object.keys(forumUsersMap).length === 0) {
-    const { data: users } = await supabaseClient.from("users").select("id, login");
-    if (users) {
-      users.forEach(u => {
-        forumUsersMap[u.id] = u.login;
-      });
-    }
-  }
-}
-
-// Główna funkcja wywoływana przy wejściu w zakładkę Forum
-async function loadForum() {
-  await pobierzUzytkownikowForum();
-
-  // Sprawdzamy, czy użytkownik był wcześniej w konkretnym wątku
-  const savedTopicId = localStorage.getItem("forum_active_topic_id");
-  if (savedTopicId) {
-    await openTopicById(parseInt(savedTopicId, 10));
-  } else {
-    showTopicsList();
-  }
-}
-
-// Powrót do listy wątków
-function showTopicsList() {
-  currentTopicId = null;
-  localStorage.removeItem("forum_active_topic_id");
-
-  const v1 = document.getElementById("forumTopicsView");
-  const v2 = document.getElementById("forumSingleTopicView");
-  if (v1 && v2) {
-    v1.style.display = "block";
-    v2.style.display = "none";
-  }
-  loadTopics();
-}
-
-// Rozwijanie / zwijanie archiwum
-window.toggleArchivedTopics = function() {
-  const list = document.getElementById("forumArchivedTopicsList");
-  const icon = document.getElementById("iconArchivedToggle");
-  if (!list) return;
-  const isHidden = list.style.display === "none";
-  list.style.display = isHidden ? "block" : "none";
-  if (icon) icon.className = isHidden ? "bi bi-chevron-up text-muted" : "bi bi-chevron-down text-muted";
-};
-
-// 1. Pobieranie listy wątków
-async function loadTopics() {
-  const activeContainer = document.getElementById("forumTopicsList");
-  const archivedContainer = document.getElementById("forumArchivedTopicsList");
-  if (!activeContainer || !archivedContainer) return;
-
-  activeContainer.innerHTML = "<div class='text-muted small py-2'>Ładowanie wątków...</div>";
-  archivedContainer.innerHTML = "<div class='text-muted small py-2'>Ładowanie archiwum...</div>";
-
-  await pobierzUzytkownikowForum();
-
-  const { data: topics, error } = await supabaseClient
-    .from("forum_topics")
-    .select("*")
-    .eq("deleted", false)
-    .order("created_at", { ascending: false });
-
-  if (error || !topics) {
-    activeContainer.innerHTML = `<div class='text-danger small py-2'>Błąd: ${error ? error.message : ''}</div>`;
-    return;
-  }
-
-  const { data: allPosts } = await supabaseClient.from("forum").select("topic_id").eq("deleted", false);
-
-  const activeTopics = topics.filter(t => !t.is_archived);
-  const archivedTopics = topics.filter(t => t.is_archived);
-
-  // Aktywne
-  if (activeTopics.length === 0) {
-    activeContainer.innerHTML = "<div class='text-muted small py-2'>Brak aktywnych wątków. Załóż temat powyżej!</div>";
-  } else {
-    activeContainer.innerHTML = activeTopics.map(t => renderSingleTopicItem(t, allPosts, false)).join("");
-  }
-
-  // Archiwalne
-  if (archivedTopics.length === 0) {
-    archivedContainer.innerHTML = "<div class='text-muted small py-2'>Brak zarchiwizowanych wątków.</div>";
-  } else {
-    archivedContainer.innerHTML = archivedTopics.map(t => renderSingleTopicItem(t, allPosts, true)).join("");
-  }
-}
-
-// Szablon wątku na liście
-function renderSingleTopicItem(t, allPosts, isArchived) {
-  const author = forumUsersMap[t.created_by] || "Uczestnik";
-  const avatar = renderAvatarHtml(author);
-  const count = allPosts ? allPosts.filter(p => p.topic_id === t.id).length : 0;
-  const dateObj = new Date(t.created_at);
-  const date = dateObj.toLocaleString("pl-PL", {
-    day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit"
-  });
-  
-  const diffSec = (new Date() - dateObj) / 1000;
-  const isAuthor = (t.created_by == currentUserId || (currentUser && author.toLowerCase() === currentUser.toLowerCase()));
-
-  let actionBtnHtml = "";
-  if (isAuthor) {
-    if (diffSec <= 60 && !isArchived) {
-      actionBtnHtml = `
-        <button class="btn btn-sm btn-outline-danger py-0 px-2 mt-1" 
-                style="font-size: 11px; white-space: nowrap;" 
-                onclick="event.stopPropagation(); deleteTopic(${t.id})">
-          🗑️ Usuń (${Math.max(0, Math.round(60 - diffSec))}s)
-        </button>
-      `;
-    } else if (!isArchived) {
-      actionBtnHtml = `
-        <button class="btn btn-sm btn-outline-secondary py-0 px-2 mt-1" 
-                style="font-size: 11px; white-space: nowrap;" 
-                onclick="event.stopPropagation(); archiveTopic(${t.id}, true)">
-          📦 Archiwizuj
-        </button>
-      `;
-    } else {
-      actionBtnHtml = `
-        <button class="btn btn-sm btn-outline-success py-0 px-2 mt-1" 
-                style="font-size: 11px; white-space: nowrap;" 
-                onclick="event.stopPropagation(); archiveTopic(${t.id}, false)">
-          🔄 Przywróć
-        </button>
-      `;
-    }
-  }
-
-  return `
-    <div class="forum-topic-item border-bottom mb-2 p-2 ${isArchived ? 'bg-light opacity-75' : ''}" onclick="openTopicById(${t.id})" style="cursor: pointer;">
-      <div class="d-flex justify-content-between align-items-start">
-        <div class="pe-2">
-          <div class="fw-bold" style="color: var(--burgund); font-size: 1rem; word-break: break-word;">${t.title}</div>
-          <div class="small text-muted mt-2 d-flex align-items-center">
-            ${avatar}
-            <span><b>${author}</b> &bull; ${date}</span>
-          </div>
-        </div>
-        <div class="d-flex flex-column align-items-end flex-shrink-0 ms-2">
-          <span class="badge bg-light text-dark border">💬 ${count}</span>
-          ${actionBtnHtml}
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-// Rozwijanie / zwijanie formularza nowego wątku
-window.toggleNewTopicForm = function() {
-  const formBox = document.getElementById("newTopicFormCollapse");
-  const icon = document.getElementById("iconNewTopicToggle");
-  if (!formBox) return;
-
-  const isHidden = formBox.style.display === "none";
-  formBox.style.display = isHidden ? "block" : "none";
-  if (icon) {
-    icon.className = isHidden ? "bi bi-chevron-up text-muted" : "bi bi-chevron-down text-muted";
-  }
-};
-
-function showTopicsList() {
-  currentTopicId = null;
-  localStorage.removeItem("forum_active_topic_id");
-
-  // Domyślnie zwiń formularz nowego wątku
-  const formBox = document.getElementById("newTopicFormCollapse");
-  const icon = document.getElementById("iconNewTopicToggle");
-  if (formBox) formBox.style.display = "none";
-  if (icon) icon.className = "bi bi-chevron-down text-muted";
-
-  const v1 = document.getElementById("forumTopicsView");
-  const v2 = document.getElementById("forumSingleTopicView");
-  if (v1 && v2) {
-    v1.style.display = "block";
-    v2.style.display = "none";
-  }
-  loadTopics();
-}
-
-// 2. Tworzenie nowego wątku
-const btnCreateTopic = document.getElementById("btnCreateTopic");
-if (btnCreateTopic) {
-  btnCreateTopic.onclick = async () => {
-    const titleInput = document.getElementById("newTopicTitle");
-    const firstPostInput = document.getElementById("newTopicFirstPost");
-    const title = titleInput.value.trim();
-    const firstPostContent = firstPostInput.innerHTML.trim();
-
-    if (!title || !firstPostContent || firstPostContent === "<br>") {
-      alert("Wpisz tytuł i treść pierwszej wiadomości!");
-      return;
-    }
-
-    btnCreateTopic.disabled = true;
-
-    const { data: topicData, error } = await supabaseClient
-      .from("forum_topics")
-      .insert({
-        title: title,
-        created_by: currentUserId,
-        is_archived: false,
-        deleted: false
-      })
-      .select().single();
-
-    if (!error && topicData) {
-      await supabaseClient.from("forum").insert({
-        topic_id: topicData.id,
-        comment: firstPostContent,
-        created_by: currentUserId,
-        deleted: false
-      });
-
-      titleInput.value = "";
-      firstPostInput.innerHTML = "";
-      btnCreateTopic.disabled = false;
-      openTopicById(topicData.id);
-    } else {
-      btnCreateTopic.disabled = false;
-      alert("Błąd podczas tworzenia wątku.");
-    }
-  };
-}
-
-// 3. Otwieranie konkretnego wątku (zapisuje stan i generuje akcje w nagłówku)
-async function openTopicById(topicId) {
-  currentTopicId = parseInt(topicId, 10);
-  localStorage.setItem("forum_active_topic_id", currentTopicId);
-
-  await pobierzUzytkownikowForum();
-
-  // Pobieramy dane wątku z bazy
-  const { data: topic, error } = await supabaseClient
-    .from("forum_topics")
-    .select("*")
-    .eq("id", currentTopicId)
-    .single();
-
-  if (error || !topic || topic.deleted) {
-    showTopicsList();
-    return;
-  }
-
-  currentTopicIsArchived = topic.is_archived;
-
-  document.getElementById("forumTopicsView").style.display = "none";
-  document.getElementById("forumSingleTopicView").style.display = "block";
-
-  // Renderowanie nagłówka wraz z przyciskiem akcji
-  const titleEl = document.getElementById("activeTopicTitle");
-  if (titleEl) {
-    const diffSec = (new Date() - new Date(topic.created_at)) / 1000;
-    const author = forumUsersMap[topic.created_by] || "";
-    const isAuthor = (topic.created_by == currentUserId || (currentUser && author.toLowerCase() === currentUser.toLowerCase()));
-
-    let headerAction = "";
-    if (isAuthor) {
-      if (diffSec <= 60 && !topic.is_archived) {
-        headerAction = `<button class="btn btn-sm btn-outline-danger py-0 px-2 ms-2" style="font-size: 11px;" onclick="deleteTopic(${topic.id})">🗑️ Usuń wątek</button>`;
-      } else if (!topic.is_archived) {
-        headerAction = `<button class="btn btn-sm btn-outline-secondary py-0 px-2 ms-2" style="font-size: 11px;" onclick="archiveTopic(${topic.id}, true)">📦 Archiwizuj wątek</button>`;
-      } else {
-        headerAction = `<button class="btn btn-sm btn-outline-success py-0 px-2 ms-2" style="font-size: 11px;" onclick="archiveTopic(${topic.id}, false)">🔄 Przywróć wątek</button>`;
-      }
-    }
-
-    titleEl.innerHTML = `
-      <span>${topic.title}</span>
-      ${topic.is_archived ? ' <span class="badge bg-secondary ms-1">Archiwum</span>' : ''}
-      ${headerAction}
-    `;
-  }
-
-  const editorCard = document.getElementById("forumPostEditor")?.closest(".card");
-  if (editorCard) {
-    editorCard.style.display = topic.is_archived ? "none" : "block";
-  }
-
-  const editor = document.getElementById("forumPostEditor");
-  if (editor) editor.innerHTML = "";
-
-  await loadPosts(currentTopicId);
-}
-
-// 4. Ładowanie postów
-async function loadPosts(topicId) {
-  const container = document.getElementById("forumPostsList");
-  if (!container) return;
-
-  const parsedId = parseInt(topicId, 10);
-  container.innerHTML = "<div class='text-muted small py-2'>Ładowanie odpowiedzi...</div>";
-
-  await pobierzUzytkownikowForum();
-
-  const { data: posts, error } = await supabaseClient
-    .from("forum")
-    .select("id, comment, created_at, created_by")
-    .eq("topic_id", parsedId)
-    .eq("deleted", false)
-    .order("created_at", { ascending: true });
-
-  if (error || !posts || posts.length === 0) {
-    container.innerHTML = "<div class='text-muted small py-3 text-center'>Brak odpowiedzi w tym wątku.</div>";
-    return;
-  }
-
-  container.innerHTML = posts.map(p => {
-    const author = forumUsersMap[p.created_by] || "Uczestnik";
-    const avatar = renderAvatarHtml(author);
-    const dateObj = new Date(p.created_at);
-    const date = dateObj.toLocaleString("pl-PL", {
-      day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit"
-    });
-
-    const diffSec = (new Date() - dateObj) / 1000;
-    const isAuthor = (p.created_by == currentUserId || (currentUser && author.toLowerCase() === currentUser.toLowerCase()));
-
-    let deleteBtn = "";
-    if (isAuthor && diffSec <= 60 && !currentTopicIsArchived) {
-      deleteBtn = `<button class="btn btn-sm btn-outline-danger py-0 px-1 ms-2" style="font-size: 10px;" onclick="deletePost(${p.id})">🗑️ Usuń (${Math.max(0, Math.round(60 - diffSec))}s)</button>`;
-    }
-
-    return `
-      <div class="forum-post-card shadow-sm mb-3 p-3 bg-white rounded-3 border">
-        <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-2">
-          <div class="d-flex align-items-center">
-            ${avatar}
-            <b style="color: var(--burgund); font-size: 0.95rem;">${author}</b>
-          </div>
-          <div class="d-flex align-items-center">
-            <span class="text-muted small" style="font-size: 11px;">${date}</span>
-            ${deleteBtn}
-          </div>
-        </div>
-        <div class="forum-post-body" style="font-size: 0.92rem; line-height: 1.5;">
-          ${p.comment}
-        </div>
-      </div>
-    `;
-  }).join("");
-}
-
-// 5. Publikacja odpowiedzi
-const btnSendPost = document.getElementById("btnSendPost");
-if (btnSendPost) {
-  btnSendPost.onclick = async () => {
-    const editor = document.getElementById("forumPostEditor");
-    const content = editor.innerHTML.trim();
-    if (!content || content === "<br>" || !currentTopicId) return;
-
-    btnSendPost.disabled = true;
-    const { error } = await supabaseClient.from("forum").insert({
-      topic_id: parseInt(currentTopicId, 10),
-      comment: content,
-      created_by: currentUserId,
-      deleted: false
-    });
-
-    btnSendPost.disabled = false;
-    if (!error) {
-      editor.innerHTML = "";
-      await loadPosts(currentTopicId);
-      window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
-    } else {
-      alert("Błąd publikacji: " + error.message);
-    }
-  };
-}
-
-// 6. Akcje
-window.deleteTopic = async function(topicId) {
-  if (!confirm("Czy na pewno chcesz usunąć ten wątek?")) return;
-  await supabaseClient.from("forum_topics").update({ deleted: true }).eq("id", parseInt(topicId, 10));
-  showTopicsList();
-};
-
-window.archiveTopic = async function(topicId, archive) {
-  const actionText = archive ? "zarchiwizować" : "przywrócić z archiwum";
-  if (!confirm(`Czy na pewno chcesz ${actionText} ten wątek?`)) return;
-
-  await supabaseClient.from("forum_topics").update({ is_archived: archive }).eq("id", parseInt(topicId, 10));
-  
-  if (currentTopicId) {
-    openTopicById(topicId);
-  } else {
-    loadTopics();
-  }
-};
-
-window.deletePost = async function(postId) {
-  if (!confirm("Czy na pewno chcesz usunąć tę wiadomość?")) return;
-  await supabaseClient.from("forum").update({ deleted: true }).eq("id", parseInt(postId, 10));
-  if (currentTopicId) loadPosts(currentTopicId);
-};
-
-// ==============================================================================
-// 9. EVENT LISTENERS
+// 9. GLOBALNE LISTENERY ZDARZEŃ
 // ==============================================================================
 function setupEventListeners() {
-  // Centrowanie mapy na Dom
   const btnHome = document.getElementById("btnCenterHome");
   if (btnHome) {
     btnHome.onclick = () => {
@@ -1994,13 +1882,11 @@ function setupEventListeners() {
     };
   }
 
-  // Obsługa kalkulatora biletów
   ["calcNormal", "calcReduced", "calcCurrency"].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.addEventListener("input", przeliczBilety);
   });
 
-  // Obsługa Kantoru
   const customToggle = document.getElementById("exCustomToggle");
   const customRateContainer = document.getElementById("exCustomRateContainer");
   const customRateInput = document.getElementById("exCustomRateInput");
@@ -2039,7 +1925,6 @@ function setupEventListeners() {
     };
   }
 
-  // Kliknięcie strzałek zamiany walut (⇄)
   const btnSwap = document.getElementById("btnSwapCurrencies");
   if (btnSwap) {
     btnSwap.onclick = () => {
@@ -2047,12 +1932,10 @@ function setupEventListeners() {
       const elTo = document.getElementById("exTo");
       if (!elFrom || !elTo) return;
 
-      // Zamiana wartości w selectach
       const temp = elFrom.value;
       elFrom.value = elTo.value;
       elTo.value = temp;
 
-      // Aktualizacja etykiet kursu i natychmiastowe przeliczenie
       updateCustomLabel();
     };
   }

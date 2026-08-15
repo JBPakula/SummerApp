@@ -1,41 +1,28 @@
 /* css/style.css */
+
+/* ============================================================================== */
+/* 0. ZMIENNE GLOBALNE I BAZOWY LAYOUT */
+/* ============================================================================== */
 :root {
   --burgund: #8B0000;
-  --burgund-hover: #6e0000;
+  --burgund-hover: #700000;
   --tlo-jasne: #F4F1EA;
   --karta-bg: #FFFFFF;
   --ramka: #C5BCB0;
   --tekst: #2D2D2D;
 }
 
-body {
-  background-color: var(--tlo-jasne);
+html, body {
+  height: 100%;
+  overflow-x: hidden;
+  background-color: var(--tlo-jasne) !important;
   color: var(--tekst);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   margin: 0;
-  padding-bottom: 70px; /* Miejsce na stopkę */
+  padding-bottom: 70px;
 }
 
-/* Karta profilowa w offcanvasie / sidebarze */
-.profile-card {
-  background: white;
-  border: 1px solid var(--ramka);
-  border-radius: 12px;
-  padding: 12px;
-  text-align: center;
-  margin-bottom: 15px;
-}
-
-.profile-avatar {
-  width: 70px;
-  height: 70px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 2px solid var(--ramka);
-  margin-bottom: 8px;
-}
-
-/* Przyciski i elementy akcentowe */
+/* Przyciski burgundowe */
 .btn-burgund {
   background-color: var(--burgund);
   color: #FFFFFF;
@@ -49,223 +36,126 @@ body {
   color: #FFFFFF;
 }
 
-/* Karty wydatków */
-.stado-card {
-  background: #FFFFFF;
-  border-radius: 12px;
-  border-left: 5px solid var(--burgund);
-  padding: 12px 16px;
-  margin-bottom: 12px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-}
-
-.stado-card-private {
-  background: #FFF8F0;
-  border-radius: 12px;
-  border-left: 5px solid #E67E22;
-  padding: 12px 16px;
-  margin-bottom: 12px;
-}
-
-/* Czat forum */
-.chat-bubble {
-  border-radius: 14px;
-  padding: 10px 14px;
-  margin-bottom: 10px;
-  max-width: 85%;
-}
-
-.chat-bubble-sent {
-  background-color: #E8F5E9;
-  border: 1px solid #C8E6C9;
-  margin-left: auto;
-}
-
-.chat-bubble-received {
-  background-color: #FFFFFF;
-  border: 1px solid var(--ramka);
-  margin-right: auto;
-}
-
-/* Stopka stała na dole */
+/* Stała dolna stopka */
 .footer-fixed {
   position: fixed;
   left: 0;
   bottom: 0;
   width: 100%;
-  background-color: var(--tlo-jasne);
-  border-top: 2px solid var(--burgund);
-  padding: 10px 15px;
-  z-index: 1030;
-  font-size: 11px;
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-top: 1px solid #E5E5E5 !important;
+  padding: 8px 16px;
+  box-sizing: border-box;
+  z-index: 9999;
+  font-size: 0.8rem;
 }
 
-/* --- 8. PROFIL UŻYTKOWNIKA W SIDEBARZE --- */
+/* ============================================================================== */
+/* 0.1 NAWIGACJA I SIDEBAR */
+/* ============================================================================== */
 .profile-card {
-    background-color: #FFFFFF;
-    border: 1px solid #C5BCB0;
-    border-radius: 14px;
-    padding: 16px;
-    text-align: center;
-    margin-bottom: 15px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+  background-color: #FFFFFF;
+  border: 1px solid var(--ramka);
+  border-radius: 14px;
+  padding: 16px;
+  text-align: center;
+  margin-bottom: 15px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
 }
 
 .profile-avatar {
-    width: 72px;
-    height: 72px;
-    border-radius: 50%;
-    object-fit: cover;
-    margin-bottom: 8px;
-    border: 2px solid var(--burgund, #8B0000);
-    background-color: #F4F1EA;
-    display: inline-block;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-bottom: 8px;
+  border: 2px solid var(--burgund);
+  background-color: var(--tlo-jasne);
+  display: inline-block;
 }
 
-/* --- 9. ZMIENNE I STYL KAFLI PULPITU (WINNICA + PŁYNNE PRZEJŚCIE) --- */
-:root {
-    --burgund: #8B0000;
-    --burgund-hover: #700000;
+/* ============================================================================== */
+/* 0.2 PULPIT (DASHBOARD) */
+/* ============================================================================== */
+.dashboard-container {
+  position: relative;
+  min-height: calc(100vh - 120px);
+  display: flex;
+  flex-direction: column;
+  background-color: #FFFFFF;
+  border-radius: 16px;
+  padding-bottom: 20px;
+  overflow: hidden;
 }
 
-body {
-    background-color: #FFFFFF !important;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    color: #2D2D2D;
+.dashboard-container > * {
+  position: relative;
+  z-index: 2;
 }
 
-/* Kontener pulpitu */
-#tab-dashboard {
-    position: relative;
-    min-height: calc(100vh - 110px);
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-start;
-    background-color: #FFFFFF;
-    border-radius: 16px;
-    padding-bottom: 20px;
-    overflow: hidden;
-}
-
-/* Zawartość pulpitu (logo + kafelki) zawsze na wierzchu i klikalna */
-#tab-dashboard > * {
-    position: relative;
-    z-index: 2;
-}
-
-/* Warstwa pejzażu na dole z idealnym, miękkim rozmyciem nieba */
-#tab-dashboard::after {
-    content: "";
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    height: 280px; /* Wysokość strefy pejzażu */
-    background-image: 
-        linear-gradient(
-            to bottom,
-            #FFFFFF 0%,
-            rgba(255, 255, 255, 0.85) 15%,
-            rgba(255, 255, 255, 0.3) 35%,
-            rgba(255, 255, 255, 0) 60%
-        ),
-        url('../assets/landscape.webp');
-    background-size: 100% 100%, 100% auto;
-    background-position: center top, center bottom;
-    background-repeat: no-repeat, no-repeat;
-    z-index: 1;
-    pointer-events: none;
+.dashboard-container::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 280px;
+  background-image: 
+      linear-gradient(
+          to bottom,
+          #FFFFFF 0%,
+          rgba(255, 255, 255, 0.85) 15%,
+          rgba(255, 255, 255, 0.3) 35%,
+          rgba(255, 255, 255, 0) 60%
+      ),
+      url('../assets/landscape.webp');
+  background-size: 100% 100%, 100% auto;
+  background-position: center top, center bottom;
+  background-repeat: no-repeat, no-repeat;
+  z-index: 1;
+  pointer-events: none;
 }
 
 .dashboard-logo {
-    max-height: 65px;
-    object-fit: contain;
+  max-height: 55px;
+  object-fit: contain;
 }
 
-/* --- 1. STOPKA SYSTEMOWA --- */
-.footer-fixed {
-    position: fixed;
-    left: 0;
-    bottom: 0;
-    width: 100%;
-    background-color: rgba(255, 255, 255, 0.95) !important;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    border-top: 1px solid #E5E5E5 !important;
-    padding: 8px 16px;
-    box-sizing: border-box;
-    z-index: 9999;
-    font-size: 0.8rem;
-}
-
-/* --- 2. GLOBALNE DOPASOWANIE WIDOKU --- */
-html, body {
-    height: 100%;
-    overflow-x: hidden;
-    background-color: #F4F1EA !important;
-}
-
-/* --- 3. PULPIT GŁÓWNY (LANDING PAGE) --- */
-.dashboard-container {
-    min-height: calc(100vh - 120px);
-    display: flex;
-    flex-direction: column;
-}
-
-/* Kafelki: zwarte, estetyczne i klikalne */
 .dashboard-card {
-    background: rgba(255, 255, 255, 0.92) !important;
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-    border: 1px solid rgba(197, 188, 176, 0.8) !important;
-    border-radius: 12px !important;
-    transition: transform 0.12s ease, background-color 0.12s ease;
-    cursor: pointer;
-    user-select: none;
-    -webkit-tap-highlight-color: transparent;
+  background: rgba(255, 255, 255, 0.92) !important;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid rgba(197, 188, 176, 0.8) !important;
+  border-radius: 12px !important;
+  transition: transform 0.12s ease, background-color 0.12s ease;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .dashboard-card:active {
-    transform: scale(0.97);
-    background-color: #FFFFFF !important;
-    border-color: var(--burgund, #8B0000) !important;
+  transform: scale(0.97);
+  background-color: #FFFFFF !important;
+  border-color: var(--burgund) !important;
 }
 
 .tile-title {
-    color: var(--burgund, #8B0000);
-    font-size: 0.95rem;
-    line-height: 1.2;
+  color: var(--burgund);
+  font-size: 0.95rem;
+  line-height: 1.2;
 }
 
 .tile-desc {
-    font-size: 0.72rem;
-    margin-top: 2px;
-    line-height: 1.1;
+  font-size: 0.72rem;
+  margin-top: 2px;
+  line-height: 1.1;
 }
 
-.dashboard-logo {
-    max-height: 50px;
-    width: auto;
-}
-
-/* --- 4. ZDJĘCIE WINNICY NA DOLE (ODSTĘP GROMADZI SIĘ NAD NIM) --- */
-.dashboard-footer-image-wrapper {
-    margin-top: auto;
-    padding-top: 15px;
-    width: 100%;
-}
-
-.dashboard-footer-image {
-    width: 100%;
-    height: auto;
-    max-height: 200px;
-    object-fit: cover;
-    border-radius: 16px 16px 0 0;
-    display: block;
-    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
-}
-
-/* --- KOLOROWE PINEZKI DLA MAPY --- */
+/* ============================================================================== */
+/* 1. MODUŁ: MAPA */
+/* ============================================================================== */
 .custom-pin {
   display: flex;
   align-items: center;
@@ -278,14 +168,12 @@ html, body {
   box-shadow: 0 2px 6px rgba(0,0,0,0.35);
 }
 
-.pin-termy { background-color: #0284c7; }      /* Niebieski */
-.pin-zwiedzanie { background-color: #b45309; } /* Ciepły bursztyn / brąz */
-.pin-inne { background-color: #4b5563; }       /* Szary grafit */
-.pin-dom { background-color: #8B0000; }        /* Burgund dom */
-.pin-jedzenie { background-color: #16a34a; }   /* Soczysta zieleń / winiarnie i gastronomia */
+.pin-termy { background-color: #0284c7; }
+.pin-zwiedzanie { background-color: #b45309; }
+.pin-inne { background-color: #4b5563; }
+.pin-dom { background-color: #8B0000; }
+.pin-jedzenie { background-color: #16a34a; }
 
-
-/* --- POPUP I BOTTOM SHEET SZCZEGÓŁÓW --- */
 .map-popup-img {
   width: 100%;
   height: 90px;
@@ -318,7 +206,100 @@ html, body {
   border: 1px solid #EDEDED;
 }
 
-/* --- WYDATKI I ZAKUPY --- */
+/* ============================================================================== */
+/* 2. MODUŁ: FORUM DYSKUSYJNE */
+/* ============================================================================== */
+.forum-topic-item {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.forum-topic-item:hover {
+  background-color: #f8fafc;
+}
+
+.forum-post-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.forum-post-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #f1f5f9;
+  padding-bottom: 6px;
+  margin-bottom: 8px;
+  font-size: 0.8rem;
+}
+
+.forum-post-body {
+  font-size: 0.92rem;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.forum-editor-box {
+  min-height: 80px;
+  max-height: 180px;
+  overflow-y: auto;
+  font-size: 0.9rem;
+}
+
+.forum-editor-box:empty:before {
+  content: attr(placeholder);
+  color: #94a3b8;
+}
+
+.forum-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1.5px solid var(--burgund);
+  vertical-align: middle;
+}
+
+.forum-avatar-placeholder {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background-color: #f1f5f9;
+  color: var(--burgund);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+  border: 1.5px solid var(--burgund);
+  vertical-align: middle;
+}
+
+/* ============================================================================== */
+/* 3. MODUŁ: WYDATKI */
+/* ============================================================================== */
+.stado-card {
+  background: #FFFFFF;
+  border-radius: 12px;
+  border-left: 5px solid var(--burgund);
+  padding: 12px 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.stado-card-private {
+  background: #FFF8F0;
+  border-radius: 12px;
+  border-left: 5px solid #E67E22;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+}
+
 .cost-date-header {
   font-size: 0.8rem;
   font-weight: 700;
@@ -345,38 +326,17 @@ html, body {
   color: white;
 }
 
+/* ============================================================================== */
+/* 4. MODUŁ: ZAKUPY */
+/* ============================================================================== */
 .shopping-item-bought {
   text-decoration: line-through;
   color: #8c8c8c;
 }
 
-.wallet-badge-fraction {
-  font-size: 0.72rem;
-  background-color: #E2E8F0;
-  color: #334155;
-  padding: 2px 6px;
-  border-radius: 6px;
-  font-weight: 600;
-}
-
-/* --- STATUSY ROZLICZEŃ W PORTFELU --- */
-.btn-settled-yes {
-  background-color: #198754 !important;
-  border-color: #198754 !important;
-  color: white !important;
-  font-size: 11px !important;
-  font-weight: 600;
-}
-
-.btn-settled-no {
-  background-color: #dc3545 !important;
-  border-color: #dc3545 !important;
-  color: white !important;
-  font-size: 11px !important;
-  font-weight: 600;
-}
-
-/* Przycisk zamiany walut w kantorze */
+/* ============================================================================== */
+/* 5. MODUŁ: KANTOR */
+/* ============================================================================== */
 .btn-swap-currency {
   background: transparent;
   border: none;
@@ -400,7 +360,41 @@ html, body {
   transform: rotate(180deg);
 }
 
-/* --- ROZGRYWKI I PODIUM --- */
+/* ============================================================================== */
+/* 6. MODUŁ: PORTFEL */
+/* ============================================================================== */
+.wallet-badge-fraction {
+  font-size: 0.72rem;
+  background-color: #E2E8F0;
+  color: #334155;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+.btn-settled-yes {
+  background-color: #198754 !important;
+  border-color: #198754 !important;
+  color: white !important;
+  font-size: 11px !important;
+  font-weight: 600;
+}
+
+.btn-settled-no {
+  background-color: #dc3545 !important;
+  border-color: #dc3545 !important;
+  color: white !important;
+  font-size: 11px !important;
+  font-weight: 600;
+}
+
+/* ============================================================================== */
+/* 7. MODUŁ: RAZEM ZA BILETY (Styl dziedziczony z kart bazowych) */
+/* ============================================================================== */
+
+/* ============================================================================== */
+/* 8. MODUŁ: ROZGRYWKI */
+/* ============================================================================== */
 .round-collapsed-card {
   background-color: #f8f9fa;
   border: 1px solid #e2e8f0;
@@ -441,83 +435,4 @@ html, body {
 .podium-other {
   background: #FFFFFF;
   border: 1px solid #E2E8F0;
-}
-
-/* --- FORUM KLASYCZNE --- */
-.forum-topic-item {
-  cursor: pointer;
-  transition: background-color 0.15s ease;
-  border-radius: 8px;
-  padding: 10px;
-}
-
-.forum-topic-item:hover {
-  background-color: #f8fafc;
-}
-
-.forum-post-card {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  padding: 12px;
-  margin-bottom: 12px;
-}
-
-.forum-post-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid #f1f5f9;
-  padding-bottom: 6px;
-  margin-bottom: 8px;
-  font-size: 0.8rem;
-}
-
-.forum-post-body {
-  font-size: 0.92rem;
-  line-height: 1.5;
-  word-break: break-word;
-}
-
-#forumPostEditor:empty:before {
-  content: attr(placeholder);
-  color: #94a3b8;
-}
-
-/* Miniaturki awatarów na forum */
-.forum-avatar {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 1.5px solid var(--burgund);
-  vertical-align: middle;
-}
-
-.forum-avatar-placeholder {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background-color: #f1f5f9;
-  color: var(--burgund);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  font-weight: bold;
-  border: 1.5px solid var(--burgund);
-  vertical-align: middle;
-}
-
-
-.forum-editor-box {
-  min-height: 80px;
-  max-height: 180px;
-  overflow-y: auto;
-  font-size: 0.9rem;
-}
-
-.forum-editor-box:empty:before {
-  content: attr(placeholder);
-  color: #94a3b8;
 }

@@ -16,7 +16,7 @@
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   
-  <!-- Dynamiczny CSS -->
+  <!-- Cache-Buster CSS -->
   <script>
     const cssLink = document.createElement('link');
     cssLink.rel = 'stylesheet';
@@ -25,26 +25,10 @@
   </script>
 </head>
 <body>
-  <script>
-  // Automatyczny cache-buster: generuje unikalny czas dla każdego wejścia
-  const v = Date.now();
-  
-  // Wstrzykuje najświeższy CSS
-  const link = document.createElement('link');
-  link.rel = 'stylesheet';
-  link.href = 'css/style.css?t=' + v;
-  document.head.appendChild(link);
 
-  // Wstrzykuje najświeższy JS
-  const script = document.createElement('script');
-  script.src = 'js/app.js?t=' + v;
-  script.defer = true;
-  document.head.appendChild(script);
-</script>
-</head>
-<body>
-
-  <!-- EKRAN LOGOWANIA -->
+  <!-- ============================================================================== -->
+  <!-- 0. EKRAN LOGOWANIA -->
+  <!-- ============================================================================== -->
   <div id="loginSection" class="container py-5" style="display: none; max-width: 420px;">
     <div class="card shadow-lg p-4 border-0 rounded-4 mt-4">
       <div class="text-center mb-3">
@@ -65,7 +49,9 @@
     </div>
   </div>
 
+  <!-- ============================================================================== -->
   <!-- GŁÓWNY WIDOK APLIKACJI -->
+  <!-- ============================================================================== -->
   <div id="appSection" style="display: none;">
     <!-- Górny Pasek Nawigacyjny -->
     <nav class="navbar navbar-light bg-light shadow-sm sticky-top px-3">
@@ -93,7 +79,7 @@
           <small class="text-muted">Ekipa: <b id="userTeamDisplay" style="color: var(--burgund);">Ekipa</b></small>
         </div>
         <div class="d-grid gap-2" id="navButtonsContainer">
-          <!-- Przyciski generowane dynamicznie -->
+          <!-- Przyciski generowane dynamicznie w JS -->
         </div>
         <hr>
         <button id="btnLogout" class="btn btn-outline-secondary w-100"><i class="bi bi-box-arrow-right"></i> Wyloguj się</button>
@@ -103,94 +89,95 @@
     <!-- Główny kontener widoków -->
     <main class="container my-2" style="max-width: 500px;">
       
-      <!-- 0. PULPIT GŁÓWNY (LANDING PAGE) -->
+      <!-- ========================================================================== -->
+      <!-- 0. PULPIT GŁÓWNY (LANDING PAGE - DOKŁADNA KOLEJNOŚĆ KAFELKÓW) -->
+      <!-- ========================================================================== -->
       <section id="tab-dashboard" class="app-tab dashboard-container">
-        <!-- Góra: Logo i powitanie -->
         <div class="text-center my-2">
           <img src="assets/logo.png" alt="Logo" class="img-fluid dashboard-logo mb-1" onerror="this.style.display='none'">
           <h5 class="fw-bold mb-0" style="color: var(--burgund);">Szia, <span id="welcomeUserName">Stado</span>!</h5>
         </div>
 
-      <!-- Środek: Siatka Kafelków (Kompaktowe 2 kolumny) -->
+        <!-- Siatka Kafelków (8 Modułów w parach) -->
         <div class="row g-2 mt-1">
-          <!-- Rząd 1: Gotowe moduły -->
+          <!-- Rząd 1: Mapa (1) & Forum (2) -->
           <div class="col-6">
             <div class="card dashboard-card shadow-sm h-100" onclick="switchTab('🗺️ Mapa')">
               <div class="card-body text-center py-2 px-1">
-                <div class="fw-bold tile-title">Mapa</div>
+                <div class="fw-bold tile-title">🗺️ Mapa</div>
                 <div class="tile-desc text-muted">Punkty i trasy</div>
-              </div>
-            </div>
-          </div>
-          <div class="col-6">
-            <div class="card dashboard-card shadow-sm h-100" onclick="switchTab('💱 Kantor')">
-              <div class="card-body text-center py-2 px-1">
-                <div class="fw-bold tile-title">Kantor</div>
-                <div class="tile-desc text-muted">HUF / PLN / EUR</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Rząd 2 -->
-          <div class="col-6">
-            <div class="card dashboard-card shadow-sm h-100" onclick="switchTab('💰 Wydatki')">
-              <div class="card-body text-center py-2 px-1">
-                <div class="fw-bold tile-title">Wydatki</div>
-                <div class="tile-desc text-muted">Wpisywanie kwot</div>
-              </div>
-            </div>
-          </div>
-          <div class="col-6">
-            <div class="card dashboard-card shadow-sm h-100" onclick="switchTab('🏦 Portfel')">
-              <div class="card-body text-center py-2 px-1">
-                <div class="fw-bold tile-title">Portfel</div>
-                <div class="tile-desc text-muted">Kto komu ile wisi</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Rząd 3 -->
-          <div class="col-6">
-            <div class="card dashboard-card shadow-sm h-100" onclick="switchTab('🛒 Zakupy')">
-              <div class="card-body text-center py-2 px-1">
-                <div class="fw-bold tile-title">Zakupy</div>
-                <div class="tile-desc text-muted">Wspólne listy</div>
-              </div>
-            </div>
-          </div>
-          <div class="col-6">
-            <div class="card dashboard-card shadow-sm h-100" onclick="switchTab('📊 Razem za bilety')">
-              <div class="card-body text-center py-2 px-1">
-                <div class="fw-bold tile-title">Razem za bilety</div>
-                <div class="tile-desc text-muted">Kalkulator biletów</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Rząd 4 -->
-          <div class="col-6">
-            <div class="card dashboard-card shadow-sm h-100" onclick="switchTab('🎲 Rozgrywki')">
-              <div class="card-body text-center py-2 px-1">
-                <div class="fw-bold tile-title">Rozgrywki</div>
-                <div class="tile-desc text-muted">Blocus, Remik</div>
               </div>
             </div>
           </div>
           <div class="col-6">
             <div class="card dashboard-card shadow-sm h-100" onclick="switchTab('💬 Forum')">
               <div class="card-body text-center py-2 px-1">
-                <div class="fw-bold tile-title">Forum</div>
-                <div class="tile-desc text-muted">Czat i ustalenia</div>
+                <div class="fw-bold tile-title">💬 Forum</div>
+                <div class="tile-desc text-muted">Wątki i ustalenia</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Rząd 2: Wydatki (3) & Zakupy (4) -->
+          <div class="col-6">
+            <div class="card dashboard-card shadow-sm h-100" onclick="switchTab('💰 Wydatki')">
+              <div class="card-body text-center py-2 px-1">
+                <div class="fw-bold tile-title">💰 Wydatki</div>
+                <div class="tile-desc text-muted">Wpisywanie kwot</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="card dashboard-card shadow-sm h-100" onclick="switchTab('🛒 Zakupy')">
+              <div class="card-body text-center py-2 px-1">
+                <div class="fw-bold tile-title">🛒 Zakupy</div>
+                <div class="tile-desc text-muted">Wspólne listy</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Rząd 3: Kantor (5) & Portfel (6) -->
+          <div class="col-6">
+            <div class="card dashboard-card shadow-sm h-100" onclick="switchTab('💱 Kantor')">
+              <div class="card-body text-center py-2 px-1">
+                <div class="fw-bold tile-title">💱 Kantor</div>
+                <div class="tile-desc text-muted">HUF / PLN / EUR</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="card dashboard-card shadow-sm h-100" onclick="switchTab('🏦 Portfel')">
+              <div class="card-body text-center py-2 px-1">
+                <div class="fw-bold tile-title">🏦 Portfel</div>
+                <div class="tile-desc text-muted">Kto komu ile wisi</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Rząd 4: Razem za bilety (7) & Rozgrywki (8) -->
+          <div class="col-6">
+            <div class="card dashboard-card shadow-sm h-100" onclick="switchTab('📊 Razem za bilety')">
+              <div class="card-body text-center py-2 px-1">
+                <div class="fw-bold tile-title">📊 Razem za bilety</div>
+                <div class="tile-desc text-muted">Kalkulator biletów</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="card dashboard-card shadow-sm h-100" onclick="switchTab('🎲 Rozgrywki')">
+              <div class="card-body text-center py-2 px-1">
+                <div class="fw-bold tile-title">🎲 Rozgrywki</div>
+                <div class="tile-desc text-muted">Blokus, Remik</div>
               </div>
             </div>
           </div>
         </div>
-
-       
       </section>
 
-<!-- Zakładka 1: Mapa -->
-      <section id="tab-map" class="app-tab">
+      <!-- ========================================================================== -->
+      <!-- 1. MODUŁ: MAPA -->
+      <!-- ========================================================================== -->
+      <section id="tab-map" class="app-tab" style="display: none;">
         <div id="mapContainer" style="height: 360px; width: 100%; border-radius: 14px;" class="shadow-sm mb-3"></div>
         <button id="btnCenterHome" class="btn btn-outline-dark btn-sm w-100 mb-3">🏠 Centruj na: Ámbitus ház (Dom)</button>
 
@@ -221,7 +208,7 @@
         <!-- Filtry i Szukajka -->
         <div class="mb-2">
           <input type="text" id="placeSearchInput" class="form-control form-control-sm rounded-pill mb-2" placeholder="🔍 Szukaj atrakcji...">
-         <div class="d-flex gap-1 overflow-auto pb-1" id="categoryPills">
+          <div class="d-flex gap-1 overflow-auto pb-1" id="categoryPills">
             <button class="btn btn-sm btn-burgund rounded-pill px-3 filter-pill active" data-cat="termy">🏊 Termy</button>
             <button class="btn btn-sm btn-outline-secondary rounded-pill px-3 filter-pill" data-cat="zwiedzanie">🏛️ Zwiedzanie</button>
             <button class="btn btn-sm btn-outline-secondary rounded-pill px-3 filter-pill" data-cat="jedzenie">🍷 Jedzenie</button>
@@ -239,20 +226,101 @@
             <h6 class="offcanvas-title fw-bold" id="sheetPlaceTitle" style="color: var(--burgund);">Szczegóły miejsca</h6>
             <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas"></button>
           </div>
-          <div class="offcanvas-body" id="sheetPlaceBody">
-            <!-- Wypełniane dynamicznie w JS -->
+          <div class="offcanvas-body" id="sheetPlaceBody"></div>
+        </div>
+      </section>
+
+      <!-- ========================================================================== -->
+      <!-- 2. MODUŁ: FORUM DYSKUSYJNE -->
+      <!-- ========================================================================== -->
+      <section id="tab-forum" class="app-tab" style="display: none;">
+        <!-- Widok listy wątków -->
+        <div id="forumTopicsView">
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <h4 class="fw-bold mb-0">💬 Forum</h4>
+            <button class="btn btn-sm btn-outline-secondary" onclick="switchTab('dashboard')"><i class="bi bi-arrow-left"></i> Wróć</button>
+          </div>
+
+          <!-- Zwijany formularz nowego wątku -->
+          <div class="card border-0 shadow-sm rounded-4 mb-3" style="border-left: 5px solid var(--burgund) !important; background: #FFFFFF;">
+            <div class="p-3 d-flex justify-content-between align-items-center" style="cursor: pointer;" onclick="toggleNewTopicForm()">
+              <h6 class="fw-bold mb-0" style="color: var(--burgund);">➕ Załóż nowy wątek</h6>
+              <i id="iconNewTopicToggle" class="bi bi-chevron-down text-muted"></i>
+            </div>
+            
+            <div id="newTopicFormCollapse" class="px-3 pb-3" style="display: none;">
+              <hr class="mt-0 mb-3 text-muted">
+              <label class="small fw-bold text-muted mb-1">Tytuł wątku:</label>
+              <input type="text" id="newTopicTitle" class="form-control form-control-sm mb-2" placeholder="Wpisz temat dyskusji...">
+
+              <label class="small fw-bold text-muted mb-1">Treść pierwszej wiadomości:</label>
+              <div class="d-flex align-items-center gap-1 mb-2 p-1 bg-light rounded border">
+                <button type="button" class="btn btn-sm btn-outline-dark fw-bold px-2 py-0" onclick="formatTopicDoc('bold')" title="Pogrubienie">B</button>
+                <button type="button" class="btn btn-sm btn-outline-dark fst-italic px-2 py-0" onclick="formatTopicDoc('italic')" title="Kursywa">I</button>
+                <button type="button" class="btn btn-sm btn-outline-dark text-decoration-underline px-2 py-0" onclick="formatTopicDoc('underline')" title="Podkreślenie">U</button>
+                <div class="vr mx-1"></div>
+                <label class="small fw-bold text-muted me-1" style="font-size: 11px;">Kolor:</label>
+                <input type="color" class="form-control form-control-color form-control-sm p-0 border-0" value="#4A1525" style="width: 26px; height: 26px; cursor: pointer;" onchange="formatTopicDoc('foreColor', this.value)" title="Wybierz kolor tekstu">
+              </div>
+
+              <div id="newTopicFirstPost" class="form-control mb-3 forum-editor-box" contenteditable="true" placeholder="Napisz pierwszy post otwierający dyskusję..."></div>
+              <button id="btnCreateTopic" class="btn btn-burgund btn-sm w-100 py-2">Opublikuj wątek</button>
+            </div>
+          </div>
+
+          <!-- Lista aktywnych wątków -->
+          <div class="card p-3 border-0 shadow-sm rounded-4 mb-3">
+            <h6 class="fw-bold mb-3" style="color: var(--burgund);">📑 Wątki dyskusyjne</h6>
+            <div id="forumTopicsList" class="list-group list-group-flush"></div>
+          </div>
+
+          <!-- Sekcja wątków archiwalnych -->
+          <div class="card p-3 border-0 shadow-sm rounded-4 mb-4">
+            <div class="d-flex justify-content-between align-items-center" style="cursor: pointer;" onclick="toggleArchivedTopics()">
+              <h6 class="fw-bold mb-0 text-muted" style="font-size: 0.9rem;">📦 Wątki archiwalne</h6>
+              <i id="iconArchivedToggle" class="bi bi-chevron-down text-muted"></i>
+            </div>
+            <div id="forumArchivedTopicsList" class="list-group list-group-flush mt-2" style="display: none;"></div>
+          </div>
+        </div>
+
+        <!-- Widok pojedynczego wątku -->
+        <div id="forumSingleTopicView" style="display: none;">
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <button class="btn btn-sm btn-outline-secondary" onclick="showTopicsList()"><i class="bi bi-arrow-left"></i> Wróć do wątków</button>
+            <h5 class="fw-bold mb-0 text-truncate px-2" id="activeTopicTitle" style="color: var(--burgund);">Wątek</h5>
+            <span></span>
+          </div>
+
+          <div id="forumPostsList" class="mb-3"></div>
+
+          <div class="card p-3 border-0 shadow-sm rounded-4 mb-4">
+            <h6 class="fw-bold mb-2" style="color: var(--burgund);">✍️ Napisz odpowiedź</h6>
+            
+            <div class="d-flex align-items-center gap-1 mb-2 p-1 bg-light rounded border">
+              <button type="button" class="btn btn-sm btn-outline-dark fw-bold px-2 py-0" onclick="formatReplyDoc('bold')" title="Pogrubienie">B</button>
+              <button type="button" class="btn btn-sm btn-outline-dark fst-italic px-2 py-0" onclick="formatReplyDoc('italic')" title="Kursywa">I</button>
+              <button type="button" class="btn btn-sm btn-outline-dark text-decoration-underline px-2 py-0" onclick="formatReplyDoc('underline')" title="Podkreślenie">U</button>
+              <div class="vr mx-1"></div>
+              <label class="small fw-bold text-muted me-1" style="font-size: 11px;">Kolor:</label>
+              <input type="color" class="form-control form-control-color form-control-sm p-0 border-0" value="#4A1525" style="width: 26px; height: 26px; cursor: pointer;" onchange="formatReplyDoc('foreColor', this.value)" title="Wybierz kolor tekstu">
+            </div>
+
+            <div id="forumPostEditor" class="form-control mb-2 forum-editor-box" contenteditable="true" placeholder="Wpisz treść odpowiedzi..."></div>
+            <button id="btnSendPost" class="btn btn-burgund btn-sm w-100 py-2">Opublikuj odpowiedź</button>
           </div>
         </div>
       </section>
 
-      <!-- 2. Zakładka: Wydatki -->
+      <!-- ========================================================================== -->
+      <!-- 3. MODUŁ: WYDATKI -->
+      <!-- ========================================================================== -->
       <section id="tab-costs" class="app-tab" style="display: none;">
         <div class="d-flex align-items-center justify-content-between mb-3">
           <h4 class="fw-bold mb-0">💰 Wydatki Stada</h4>
           <button class="btn btn-sm btn-outline-secondary" onclick="switchTab('dashboard')"><i class="bi bi-arrow-left"></i> Wróć</button>
         </div>
 
-        <!-- Formularz dodawania wydatku -->
         <div class="card p-3 border-0 shadow-sm rounded-4 mb-4" style="background: #FFFFFF; border-left: 5px solid var(--burgund) !important;">
           <h6 class="fw-bold mb-2" style="color: var(--burgund);">➕ Nowy wydatek</h6>
           <form id="formCost">
@@ -277,7 +345,6 @@
               <label class="form-check-label small fw-bold" for="costIsPrivate">🔒 Prywatny (tylko dla Ciebie i Twojej pary)</label>
             </div>
             
-            <!-- Kontener wyboru beneficjentów -->
             <div class="mb-2" id="costBorrowerWrapper">
               <label class="small fw-bold text-muted d-block mb-1">Dla kogo (rozliczenie):</label>
               
@@ -296,7 +363,6 @@
                 </div>
               </div>
 
-              <!-- Wybór Ekip -->
               <div id="boxBorrowerTeams" class="p-2 border rounded-3 bg-light mb-2" style="display: none;">
                 <div class="fw-bold small text-muted mb-1">Zaznacz ekipy:</div>
                 <div class="d-flex flex-wrap gap-2">
@@ -307,7 +373,6 @@
                 </div>
               </div>
 
-              <!-- Wybór Osób -->
               <div id="boxBorrowerUsers" class="p-2 border rounded-3 bg-light mb-2" style="display: none; max-height: 140px; overflow-y: auto;">
                 <div class="fw-bold small text-muted mb-1">Zaznacz osoby:</div>
                 <div id="borrowerUsersCheckboxes" class="d-flex flex-wrap gap-1"></div>
@@ -325,30 +390,9 @@
         <div id="costsList"></div>
       </section>
 
-      <!-- 3. Zakładka: Portfel -->
-      <section id="tab-wallet" class="app-tab" style="display: none;">
-        <div class="d-flex align-items-center justify-content-between mb-3">
-          <h4 class="fw-bold mb-0">🏦 Portfel</h4>
-          <button class="btn btn-sm btn-outline-secondary" onclick="switchTab('dashboard')"><i class="bi bi-arrow-left"></i> Wróć</button>
-        </div>
-
-        <div class="card p-3 border-0 shadow-sm rounded-4 mb-3">
-          <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
-            <span class="fw-bold">Twój Bilans:</span>
-            <span id="walletTotalSummary" class="fs-5 fw-bold">0 HUF</span>
-          </div>
-
-          <h6 class="text-danger fw-bold mb-2">🔴 Do oddania innym:</h6>
-          <div id="walletOweList" class="small mb-3"></div>
-
-          <hr>
-
-          <h6 class="text-success fw-bold mb-2">🟢 Do odebrania od innych:</h6>
-          <div id="walletDueList" class="small mb-2"></div>
-        </div>
-      </section>
-
-      <!-- 4. Zakładka: Zakupy -->
+      <!-- ========================================================================== -->
+      <!-- 4. MODUŁ: ZAKUPY -->
+      <!-- ========================================================================== -->
       <section id="tab-shopping" class="app-tab" style="display: none;">
         <div class="d-flex align-items-center justify-content-between mb-3">
           <h4 class="fw-bold mb-0">🛒 Listy Zakupów</h4>
@@ -424,33 +468,9 @@
         </div>
       </section>
 
-     <!-- 5. Zakładka: Razem za bilety -->
-      <section id="tab-calc" class="app-tab" style="display: none;">
-        <div class="d-flex align-items-center justify-content-between mb-3">
-          <h4 class="fw-bold mb-0">🎟️ Razem za bilety</h4>
-          <button class="btn btn-sm btn-outline-secondary" onclick="switchTab('dashboard')"><i class="bi bi-arrow-left"></i> Wróć</button>
-        </div>
-        <div class="card p-3 border-0 shadow-sm rounded-4">
-          <div class="mb-2">
-            <label class="small fw-bold">Waluta:</label>
-            <select id="calcCurrency" class="form-select form-select-sm">
-              <option value="HUF">HUF</option><option value="PLN">PLN</option><option value="EUR">EUR</option>
-            </select>
-          </div>
-          <div class="mb-2">
-            <label class="small fw-bold">Cena biletu normalnego:</label>
-            <input type="number" id="calcNormal" class="form-control form-control-sm" value="0">
-          </div>
-          <div class="mb-3">
-            <label class="small fw-bold">Cena biletu ulgowego:</label>
-            <input type="number" id="calcReduced" class="form-control form-control-sm" value="0">
-          </div>
-          <div id="calcResults" class="p-3 bg-light rounded-3"></div>
-        </div>
-      </section>
-
-
-<!-- 6. Zakładka: Kantor -->
+      <!-- ========================================================================== -->
+      <!-- 5. MODUŁ: KANTOR -->
+      <!-- ========================================================================== -->
       <section id="tab-exchange" class="app-tab" style="display: none;">
         <div class="d-flex align-items-center justify-content-between mb-3">
           <h4 class="fw-bold mb-0">💱 Kantor</h4>
@@ -458,7 +478,6 @@
         </div>
 
         <div class="card p-3 border-0 shadow-sm rounded-4 mb-3">
-          <!-- Szybkie przyciski kwot -->
           <div class="d-flex gap-1 overflow-auto pb-2 mb-1" id="quickAmounts">
             <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-2 py-0" style="font-size: 11px;" onclick="setKantorAmount(500)">500</button>
             <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-2 py-0" style="font-size: 11px;" onclick="setKantorAmount(1000)">1 000</button>
@@ -471,7 +490,6 @@
           <label class="small fw-bold mb-1">Kwota:</label>
           <input type="number" id="exAmount" class="form-control form-control-sm mb-2" value="1000" min="0" step="any">
           
-          <!-- Wybór walut ze strzałkami odwracania -->
           <div class="row g-2 align-items-end mb-2">
             <div class="col-5">
               <label class="small text-muted">Z waluty:</label>
@@ -496,25 +514,21 @@
             </div>
           </div>
 
-          <!-- Przełącznik własnego kursu -->
           <div class="form-check form-switch mb-2">
             <input class="form-check-input" type="checkbox" id="exCustomToggle">
             <label class="form-check-label small fw-bold" for="exCustomToggle">✏️ Wpisz własny kurs</label>
           </div>
 
-          <!-- Pole własnego kursu -->
           <div id="exCustomRateContainer" class="mb-2" style="display: none;">
             <label class="small text-muted" id="exCustomRateLabel">Własny kurs:</label>
             <input type="number" id="exCustomRateInput" class="form-control form-control-sm" step="0.0001" placeholder="Wpisz kurs">
           </div>
 
-          <!-- Główny wynik przeliczenia -->
           <div id="exResult" class="p-3 text-center rounded-3 my-1" style="background:#FFF2F2; border:1px solid var(--burgund);">
             <div class="fs-4 fw-bold" style="color:var(--burgund);">---</div>
           </div>
         </div>
 
-        <!-- Ściągawka kieszonkowa na dole ekranu -->
         <div class="card p-3 border-0 shadow-sm rounded-4 mb-4">
           <div class="d-flex justify-content-between align-items-center mb-2">
             <h6 class="fw-bold mb-0" style="color: var(--burgund); font-size: 0.9rem;">📋 Szybka ściągawka przeliczeń</h6>
@@ -528,19 +542,70 @@
         </div>
       </section>
 
-    
-     <!-- 7. Zakładka: Rozgrywki -->
+      <!-- ========================================================================== -->
+      <!-- 6. MODUŁ: PORTFEL -->
+      <!-- ========================================================================== -->
+      <section id="tab-wallet" class="app-tab" style="display: none;">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+          <h4 class="fw-bold mb-0">🏦 Portfel</h4>
+          <button class="btn btn-sm btn-outline-secondary" onclick="switchTab('dashboard')"><i class="bi bi-arrow-left"></i> Wróć</button>
+        </div>
+
+        <div class="card p-3 border-0 shadow-sm rounded-4 mb-3">
+          <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
+            <span class="fw-bold">Twój Bilans:</span>
+            <span id="walletTotalSummary" class="fs-5 fw-bold">0 HUF</span>
+          </div>
+
+          <h6 class="text-danger fw-bold mb-2">🔴 Do oddania innym:</h6>
+          <div id="walletOweList" class="small mb-3"></div>
+
+          <hr>
+
+          <h6 class="text-success fw-bold mb-2">🟢 Do odebrania od innych:</h6>
+          <div id="walletDueList" class="small mb-2"></div>
+        </div>
+      </section>
+
+      <!-- ========================================================================== -->
+      <!-- 7. MODUŁ: RAZEM ZA BILETY -->
+      <!-- ========================================================================== -->
+      <section id="tab-calc" class="app-tab" style="display: none;">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+          <h4 class="fw-bold mb-0">📊 Razem za bilety</h4>
+          <button class="btn btn-sm btn-outline-secondary" onclick="switchTab('dashboard')"><i class="bi bi-arrow-left"></i> Wróć</button>
+        </div>
+        <div class="card p-3 border-0 shadow-sm rounded-4">
+          <div class="mb-2">
+            <label class="small fw-bold">Waluta:</label>
+            <select id="calcCurrency" class="form-select form-select-sm">
+              <option value="HUF">HUF</option><option value="PLN">PLN</option><option value="EUR">EUR</option>
+            </select>
+          </div>
+          <div class="mb-2">
+            <label class="small fw-bold">Cena biletu normalnego:</label>
+            <input type="number" id="calcNormal" class="form-control form-control-sm" value="0">
+          </div>
+          <div class="mb-3">
+            <label class="small fw-bold">Cena biletu ulgowego:</label>
+            <input type="number" id="calcReduced" class="form-control form-control-sm" value="0">
+          </div>
+          <div id="calcResults" class="p-3 bg-light rounded-3"></div>
+        </div>
+      </section>
+
+      <!-- ========================================================================== -->
+      <!-- 8. MODUŁ: ROZGRYWKI -->
+      <!-- ========================================================================== -->
       <section id="tab-games" class="app-tab" style="display: none;">
         <div class="d-flex align-items-center justify-content-between mb-3">
           <h4 class="fw-bold mb-0">🎲 Rozgrywki</h4>
           <button class="btn btn-sm btn-outline-secondary" onclick="switchTab('dashboard')"><i class="bi bi-arrow-left"></i> Wróć</button>
         </div>
 
-        <!-- 1. KROK: Kreator nowej gry (jeśli brak aktywnej rozgrywki) -->
         <div id="gameSetupCard" class="card p-3 border-0 shadow-sm rounded-4 mb-4" style="background: #FFFFFF; border-left: 5px solid var(--burgund) !important;">
           <h6 class="fw-bold mb-3" style="color: var(--burgund);">➕ Nowa rozgrywka</h6>
           
-        <!-- Wybór gry -->
           <div class="mb-3">
             <label class="small fw-bold text-muted mb-1">Wybierz grę:</label>
             <select id="gameTypeSelect" class="form-select form-select-sm mb-2">
@@ -554,7 +619,6 @@
             <div id="customGameContainer" style="display: none;" class="p-3 border rounded-3 bg-light mb-2">
               <input type="text" id="customGameNameInput" class="form-control form-control-sm mb-3" placeholder="Wpisz nazwę gry...">
               
-              <!-- Elegancki suwak wyboru zasady wygranej -->
               <div class="d-flex align-items-center justify-content-between p-2 bg-white rounded-3 border">
                 <span class="small fw-bold" id="labelScoreRule">📈 Wygrywa: NAJWIĘCEJ pkt</span>
                 <div class="form-check form-switch m-0">
@@ -564,7 +628,6 @@
             </div>
           </div>
 
-          <!-- Wybór graczy (min. 2) -->
           <div class="mb-3">
             <label class="small fw-bold text-muted d-block mb-1">Wybierz graczy (zaznacz min. 2 osoby):</label>
             <div id="gamePlayersCheckboxes" class="d-flex flex-wrap gap-1 p-2 border rounded-3 bg-light"></div>
@@ -574,7 +637,6 @@
           <button id="btnStartGame" class="btn btn-burgund btn-sm w-100 py-2">▶ Rozpocznij rozgrywkę</button>
         </div>
 
-        <!-- 2. KROK: Trwająca rozgrywka (Rundy i wpisywanie punktów) -->
         <div id="activeGameArea" style="display: none;">
           <div class="card p-3 border-0 shadow-sm rounded-4 mb-3">
             <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
@@ -585,10 +647,8 @@
               <button id="btnFinishGame" class="btn btn-danger btn-sm px-3">🏁 Zakończ grę</button>
             </div>
 
-            <!-- Kontener z historią ukończonych rund -->
             <div id="completedRoundsList" class="mb-2"></div>
 
-            <!-- Kontener bieżącej, otwartej rundy -->
             <div id="currentRoundBox" class="p-3 border rounded-3 bg-light mt-2">
               <h6 class="fw-bold mb-2 text-primary" id="currentRoundTitle">Runda 1</h6>
               <div id="currentRoundInputs" class="row g-2 mb-3"></div>
@@ -597,104 +657,17 @@
           </div>
         </div>
 
-        <!-- 3. KROK: Wyniki i Podium zakończonej gry -->
         <div id="gamePodiumCard" class="card p-3 border-0 shadow-sm rounded-4 mb-4 text-center" style="display: none;">
           <h5 class="fw-bold mb-3" style="color: var(--burgund);">🏆 Wyniki końcowe</h5>
           <div id="podiumList" class="mb-3 text-start"></div>
           <button id="btnNewGameReset" class="btn btn-burgund btn-sm w-100">Nowa rozgrywka</button>
         </div>
 
-        <!-- 4. KROK: Historia ostatnich gier -->
         <div class="card p-3 border-0 shadow-sm rounded-4 mb-4">
           <h6 class="fw-bold mb-2" style="color: var(--burgund);">📜 Archiwum rozgrywek:</h6>
           <div id="pastGamesList" class="small text-muted"></div>
         </div>
       </section>
-
-<!-- 8. Zakładka: Forum -->
-      <section id="tab-forum" class="app-tab" style="display: none;">
-<!-- WIDOK 1: LISTA WĄTKÓW I TWORZENIE NOWEGO -->
-        <div id="forumTopicsView">
-          <div class="d-flex align-items-center justify-content-between mb-3">
-            <h4 class="fw-bold mb-0">💬 Forum</h4>
-            <button class="btn btn-sm btn-outline-secondary" onclick="switchTab('dashboard')"><i class="bi bi-arrow-left"></i> Wróć</button>
-          </div>
-
-          <!-- Formularz nowego wątku (domyślnie zwinięty) -->
-          <div class="card border-0 shadow-sm rounded-4 mb-3" style="border-left: 5px solid var(--burgund) !important; background: #FFFFFF;">
-            <div class="p-3 d-flex justify-content-between align-items-center" style="cursor: pointer;" onclick="toggleNewTopicForm()">
-              <h6 class="fw-bold mb-0" style="color: var(--burgund);">➕ Załóż nowy wątek</h6>
-              <i id="iconNewTopicToggle" class="bi bi-chevron-down text-muted"></i>
-            </div>
-            
-            <div id="newTopicFormCollapse" class="px-3 pb-3" style="display: none;">
-              <hr class="mt-0 mb-3 text-muted">
-              <label class="small fw-bold text-muted mb-1">Tytuł wątku:</label>
-              <input type="text" id="newTopicTitle" class="form-control form-control-sm mb-2" placeholder="Wpisz temat dyskusji...">
-
-              <label class="small fw-bold text-muted mb-1">Treść pierwszej wiadomości:</label>
-              <div class="d-flex align-items-center gap-1 mb-2 p-1 bg-light rounded border">
-                <button type="button" class="btn btn-sm btn-outline-dark fw-bold px-2 py-0" onclick="formatTopicDoc('bold')" title="Pogrubienie">B</button>
-                <button type="button" class="btn btn-sm btn-outline-dark fst-italic px-2 py-0" onclick="formatTopicDoc('italic')" title="Kursywa">I</button>
-                <button type="button" class="btn btn-sm btn-outline-dark text-decoration-underline px-2 py-0" onclick="formatTopicDoc('underline')" title="Podkreślenie">U</button>
-                <div class="vr mx-1"></div>
-                <label class="small fw-bold text-muted me-1" style="font-size: 11px;">Kolor:</label>
-                <input type="color" class="form-control form-control-color form-control-sm p-0 border-0" value="#4A1525" style="width: 26px; height: 26px; cursor: pointer;" onchange="formatTopicDoc('foreColor', this.value)" title="Wybierz kolor tekstu">
-              </div>
-
-              <div id="newTopicFirstPost" class="form-control mb-3 forum-editor-box" contenteditable="true" placeholder="Napisz pierwszy post otwierający dyskusję..."></div>
-              <button id="btnCreateTopic" class="btn btn-burgund btn-sm w-100 py-2">Opublikuj wątek</button>
-            </div>
-          </div>
-
-          <!-- Lista aktywnych wątków -->
-          <div class="card p-3 border-0 shadow-sm rounded-4 mb-3">
-            <h6 class="fw-bold mb-3" style="color: var(--burgund);">📑 Wątki dyskusyjne</h6>
-            <div id="forumTopicsList" class="list-group list-group-flush"></div>
-          </div>
-
-          <!-- Sekcja Wątków Archiwalnych -->
-          <div class="card p-3 border-0 shadow-sm rounded-4 mb-4">
-            <div class="d-flex justify-content-between align-items-center" style="cursor: pointer;" onclick="toggleArchivedTopics()">
-              <h6 class="fw-bold mb-0 text-muted" style="font-size: 0.9rem;">📦 Wątki archiwalne</h6>
-              <i id="iconArchivedToggle" class="bi bi-chevron-down text-muted"></i>
-            </div>
-            <div id="forumArchivedTopicsList" class="list-group list-group-flush mt-2" style="display: none;"></div>
-          </div>
-        </div>
-
-        <!-- WIDOK 2: WIDOK POJEDYNCZEGO WĄTKU -->
-        <div id="forumSingleTopicView" style="display: none;">
-          <div class="d-flex align-items-center justify-content-between mb-3">
-            <button class="btn btn-sm btn-outline-secondary" onclick="showTopicsList()"><i class="bi bi-arrow-left"></i> Wróć do wątków</button>
-            <h5 class="fw-bold mb-0 text-truncate px-2" id="activeTopicTitle" style="color: var(--burgund);">Wątek</h5>
-            <span></span>
-          </div>
-
-          <!-- Lista wszystkich wpisów w wątku -->
-          <div id="forumPostsList" class="mb-3"></div>
-
-          <!-- Formularz kolejnej odpowiedzi -->
-          <div class="card p-3 border-0 shadow-sm rounded-4 mb-4">
-            <h6 class="fw-bold mb-2" style="color: var(--burgund);">✍️ Napisz odpowiedź</h6>
-            
-            <!-- Pasek formatowania -->
-            <div class="d-flex align-items-center gap-1 mb-2 p-1 bg-light rounded border">
-              <button type="button" class="btn btn-sm btn-outline-dark fw-bold px-2 py-0" onclick="formatReplyDoc('bold')" title="Pogrubienie">B</button>
-              <button type="button" class="btn btn-sm btn-outline-dark fst-italic px-2 py-0" onclick="formatReplyDoc('italic')" title="Kursywa">I</button>
-              <button type="button" class="btn btn-sm btn-outline-dark text-decoration-underline px-2 py-0" onclick="formatReplyDoc('underline')" title="Podkreślenie">U</button>
-              <div class="vr mx-1"></div>
-              <label class="small fw-bold text-muted me-1" style="font-size: 11px;">Kolor:</label>
-              <input type="color" class="form-control form-control-color form-control-sm p-0 border-0" value="#4A1525" style="width: 26px; height: 26px; cursor: pointer;" onchange="formatReplyDoc('foreColor', this.value)" title="Wybierz kolor tekstu">
-            </div>
-
-            <div id="forumPostEditor" class="form-control mb-2 forum-editor-box" contenteditable="true" placeholder="Wpisz treść odpowiedzi..."></div>
-
-            <button id="btnSendPost" class="btn btn-burgund btn-sm w-100 py-2">Opublikuj odpowiedź</button>
-          </div>
-        </div>
-      </section>
-
 
     </main>
 
@@ -705,14 +678,16 @@
     </footer>
   </div>
 
-  <!-- Skrypty -->
+  <!-- Biblioteki zewnętrzne -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<!-- Dynamiczny JS (zawsze najświeższa wersja) -->
+
+  <!-- Dynamiczne wstrzyknięcie skryptu aplikacji (dokładnie raz) -->
   <script>
     const appScript = document.createElement('script');
     appScript.src = 'js/app.js?t=' + Date.now();
+    appScript.defer = true;
     document.body.appendChild(appScript);
   </script>
 </body>
