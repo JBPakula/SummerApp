@@ -317,3 +317,61 @@ html, body {
   font-size: 0.85rem;
   border: 1px solid #EDEDED;
 }
+
+/* --- WYDATKI I ZAKUPY --- */
+.cost-date-header {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #6c757d;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 14px;
+  margin-bottom: 6px;
+  border-bottom: 1px dashed var(--ramka);
+  padding-bottom: 3px;
+}
+
+.cost-delete-btn {
+  font-size: 11px;
+  color: #dc3545;
+  border: 1px solid #dc3545;
+  background: transparent;
+  border-radius: 6px;
+  padding: 2px 6px;
+}
+
+.cost-delete-btn:hover {
+  background: #dc3545;
+  color: white;
+}
+
+.shopping-item-bought {
+  text-decoration: line-through;
+  color: #8c8c8c;
+}
+
+.wallet-badge-fraction {
+  font-size: 0.72rem;
+  background-color: #E2E8F0;
+  color: #334155;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+/* --- STATUSY ROZLICZEŃ W PORTFELU --- */
+.btn-settled-yes {
+  background-color: #198754 !important;
+  border-color: #198754 !important;
+  color: white !important;
+  font-size: 11px !important;
+  font-weight: 600;
+}
+
+.btn-settled-no {
+  background-color: #dc3545 !important;
+  border-color: #dc3545 !important;
+  color: white !important;
+  font-size: 11px !important;
+  font-weight: 600;
+}

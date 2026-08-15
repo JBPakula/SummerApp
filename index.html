@@ -251,50 +251,100 @@
           <h4 class="fw-bold mb-0">💰 Wydatki Stada</h4>
           <button class="btn btn-sm btn-outline-secondary" onclick="switchTab('dashboard')"><i class="bi bi-arrow-left"></i> Wróć</button>
         </div>
-        <div class="card p-3 border-0 shadow-sm rounded-4 mb-4">
-          <h6 class="fw-bold" style="color: var(--burgund);">➕ Dodaj nowy wydatek</h6>
+
+        <!-- Formularz dodawania wydatku -->
+        <div class="card p-3 border-0 shadow-sm rounded-4 mb-4" style="background: #FFFFFF; border-left: 5px solid var(--burgund) !important;">
+          <h6 class="fw-bold mb-2" style="color: var(--burgund);">➕ Nowy wydatek</h6>
           <form id="formCost">
-            <div class="mb-2"><input type="text" id="costName" class="form-control form-control-sm" placeholder="Za co?" required></div>
+            <div class="mb-2">
+              <input type="text" id="costName" class="form-control form-control-sm" placeholder="Za co? (np. Obiad w czardzie, Winiarnia)" required>
+            </div>
             <div class="row g-2 mb-2">
-              <div class="col-7"><input type="number" id="costAmount" step="0.01" class="form-control form-control-sm" placeholder="Kwota" required></div>
+              <div class="col-7">
+                <input type="number" id="costAmount" step="any" class="form-control form-control-sm" placeholder="Kwota" required>
+              </div>
               <div class="col-5">
                 <select id="costCurrency" class="form-select form-select-sm">
-                  <option value="HUF">HUF</option><option value="PLN">PLN</option><option value="EUR">EUR</option>
+                  <option value="HUF">HUF</option>
+                  <option value="PLN">PLN</option>
+                  <option value="EUR">EUR</option>
                 </select>
               </div>
             </div>
-            <div class="mb-2">
-              <select id="costBorrower" class="form-select form-select-sm">
-                <option value="Całe Stado">Całe Stado</option><option value="Bobry">Bobry</option><option value="Sileziny">Sileziny</option><option value="Robaki">Robaki</option><option value="Pakuły">Pakuły</option>
-              </select>
-            </div>
-            <div class="mb-2"><input type="text" id="costComment" class="form-control form-control-sm" placeholder="Komentarz (opcjonalnie)"></div>
+
             <div class="form-check mb-2">
               <input class="form-check-input" type="checkbox" id="costIsPrivate">
-              <label class="form-check-label small" for="costIsPrivate">🔒 Prywatny (tylko dla pary)</label>
+              <label class="form-check-label small fw-bold" for="costIsPrivate">🔒 Prywatny (tylko dla Ciebie i Twojej pary)</label>
+            </div>
+            
+            <!-- Kontener wyboru beneficjentów -->
+            <div class="mb-2" id="costBorrowerWrapper">
+              <label class="small fw-bold text-muted d-block mb-1">Dla kogo (rozliczenie):</label>
+              
+              <div class="d-flex flex-column gap-1 mb-2">
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="borrowerMode" id="bModeAll" value="all" checked>
+                  <label class="form-check-label small fw-bold" for="bModeAll">Całe Stado (4 ekipy)</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="borrowerMode" id="bModeTeams" value="teams">
+                  <label class="form-check-label small fw-bold" for="bModeTeams">Wybrane ekipy (drużynowo)</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="borrowerMode" id="bModeUsers" value="users">
+                  <label class="form-check-label small fw-bold" for="bModeUsers">Konkretne osoby (indywidualnie)</label>
+                </div>
+              </div>
+
+              <!-- Wybór Ekip -->
+              <div id="boxBorrowerTeams" class="p-2 border rounded-3 bg-light mb-2" style="display: none;">
+                <div class="fw-bold small text-muted mb-1">Zaznacz ekipy:</div>
+                <div class="d-flex flex-wrap gap-2">
+                  <label class="badge bg-white text-dark border p-2"><input type="checkbox" class="team-cb" value="Bobry"> Bobry</label>
+                  <label class="badge bg-white text-dark border p-2"><input type="checkbox" class="team-cb" value="Pakuły"> Pakuły</label>
+                  <label class="badge bg-white text-dark border p-2"><input type="checkbox" class="team-cb" value="Robaki"> Robaki</label>
+                  <label class="badge bg-white text-dark border p-2"><input type="checkbox" class="team-cb" value="Sileziny"> Sileziny</label>
+                </div>
+              </div>
+
+              <!-- Wybór Osób -->
+              <div id="boxBorrowerUsers" class="p-2 border rounded-3 bg-light mb-2" style="display: none; max-height: 140px; overflow-y: auto;">
+                <div class="fw-bold small text-muted mb-1">Zaznacz osoby:</div>
+                <div id="borrowerUsersCheckboxes" class="d-flex flex-wrap gap-1"></div>
+              </div>
+            </div>
+
+            <div class="mb-2">
+              <input type="text" id="costComment" class="form-control form-control-sm" placeholder="Komentarz (opcjonalnie)">
             </div>
             <button type="submit" class="btn btn-burgund btn-sm w-100">Zapisz wydatek</button>
           </form>
         </div>
+
+        <h6 class="fw-bold mb-2">📅 Historia transakcji:</h6>
         <div id="costsList"></div>
       </section>
 
       <!-- 3. Zakładka: Portfel -->
       <section id="tab-wallet" class="app-tab" style="display: none;">
         <div class="d-flex align-items-center justify-content-between mb-3">
-          <h4 class="fw-bold mb-0">🏦 Bilans Ekipy</h4>
+          <h4 class="fw-bold mb-0">🏦 Portfel</h4>
           <button class="btn btn-sm btn-outline-secondary" onclick="switchTab('dashboard')"><i class="bi bi-arrow-left"></i> Wróć</button>
         </div>
+
         <div class="card p-3 border-0 shadow-sm rounded-4 mb-3">
-          <h6 class="text-danger fw-bold">🔴 Mamy oddać:</h6>
-          <div id="walletOweList" class="small mb-3"></div>
-          <h6 class="text-success fw-bold">🟢 Ktoś nam zalega:</h6>
-          <div id="walletDueList" class="small mb-3"></div>
-          <hr>
-          <div class="d-flex justify-content-between align-items-center">
-            <span class="fw-bold">Bilans końcowy:</span>
-            <span id="walletTotalSummary" class="fs-5 fw-bold">0.00 PLN</span>
+          <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
+            <span class="fw-bold">Twój Bilans:</span>
+            <span id="walletTotalSummary" class="fs-5 fw-bold">0 HUF</span>
           </div>
+
+          <h6 class="text-danger fw-bold mb-2">🔴 Do oddania innym:</h6>
+          <div id="walletOweList" class="small mb-3"></div>
+
+          <hr>
+
+          <h6 class="text-success fw-bold mb-2">🟢 Do odebrania od innych:</h6>
+          <div id="walletDueList" class="small mb-2"></div>
         </div>
       </section>
 
@@ -304,15 +354,74 @@
           <h4 class="fw-bold mb-0">🛒 Listy Zakupów</h4>
           <button class="btn btn-sm btn-outline-secondary" onclick="switchTab('dashboard')"><i class="bi bi-arrow-left"></i> Wróć</button>
         </div>
-        <div class="d-flex gap-2 mb-3">
-          <button id="btnNewShoppingList" class="btn btn-burgund btn-sm">+ Nowa lista</button>
+
+        <div class="d-flex gap-2 mb-3 align-items-center">
+          <button id="btnNewShoppingList" class="btn btn-burgund btn-sm text-nowrap">+ Nowa lista</button>
           <select id="shoppingListSelect" class="form-select form-select-sm"></select>
         </div>
-        <div class="input-group input-group-sm mb-3">
-          <input type="text" id="newProductInput" class="form-control" placeholder="Dodaj produkt...">
-          <button id="btnAddProduct" class="btn btn-outline-secondary">Dodaj</button>
+
+        <div id="activeListControls" class="mb-3">
+          <div class="input-group input-group-sm mb-2">
+            <input type="text" id="newProductInput" class="form-control" list="productSuggestions" placeholder="Wpisz produkt i wciśnij Enter..." autocomplete="off">
+            <datalist id="productSuggestions"></datalist>
+            <button id="btnAddProduct" class="btn btn-outline-secondary">Dodaj</button>
+          </div>
+          <button id="btnFinishShoppingManual" class="btn btn-outline-success btn-sm w-100 mb-2">
+            🏁 Zakończ zakupy i wpisz rachunek
+          </button>
         </div>
-        <ul id="shoppingItemsList" class="list-group mb-3"></ul>
+
+        <ul id="shoppingItemsList" class="list-group shadow-sm rounded-3 mb-3"></ul>
+
+        <div id="closedListBadge" class="alert alert-secondary text-center small py-2" style="display: none;">
+          🔒 Ta lista została zamknięta i rozliczona w Wydatkach.
+        </div>
+
+        <!-- Modal finalizacji zakupów -->
+        <div class="modal fade" id="modalFinishShopping" tabindex="-1">
+          <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content rounded-4 border-0 shadow">
+              <div class="modal-header border-bottom py-2">
+                <h6 class="modal-title fw-bold" style="color: var(--burgund);">🧾 Zakończ zakupy</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+              </div>
+              <div class="modal-body">
+                <form id="formFinishShopping">
+                  <div class="mb-2">
+                    <label class="small fw-bold">Kwota z paragonu:</label>
+                    <div class="row g-2">
+                      <div class="col-7">
+                        <input type="number" id="finishAmount" step="any" class="form-control form-control-sm" placeholder="0.00" required>
+                      </div>
+                      <div class="col-5">
+                        <select id="finishCurrency" class="form-select form-select-sm">
+                          <option value="HUF" selected>HUF</option>
+                          <option value="PLN">PLN</option>
+                          <option value="EUR">EUR</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="mb-2">
+                    <label class="small fw-bold">Dla kogo zakup:</label>
+                    <select id="finishBorrower" class="form-select form-select-sm">
+                      <option value="Całe Stado">Całe Stado</option>
+                      <option value="Bobry">Bobry (tylko ta ekipa)</option>
+                      <option value="Pakuły">Pakuły (tylko ta ekipa)</option>
+                      <option value="Robaki">Robaki (tylko ta ekipa)</option>
+                      <option value="Sileziny">Sileziny (tylko ta ekipa)</option>
+                    </select>
+                  </div>
+                  <div class="mb-3">
+                    <label class="small text-muted">Komentarz:</label>
+                    <input type="text" id="finishComment" class="form-control form-control-sm" placeholder="np. Zakupy spożywcze">
+                  </div>
+                  <button type="submit" class="btn btn-burgund btn-sm w-100">Zatwierdź i rozlicz</button>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
 
       <!-- 5. Zakładka: Płacimy Razem -->

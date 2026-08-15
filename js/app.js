@@ -570,172 +570,541 @@ window.pokazSzczegolyMiejsca = function(placeId) {
 // 5. MODUŁ: WYDATKI
 // ==============================================================================
 async function loadCosts() {
-  const { data } = await supabaseClient.from("costs").select("*").eq("deleted", false).order("created_at", { ascending: false });
   const container = document.getElementById("costsList");
+  if (!container) return;
   container.innerHTML = "";
 
-  if (data) {
-    data.forEach(c => {
-      if (c.is_private) {
-        const allowedUsers = [c.paid_by, malzenstwaMapa[c.paid_by]];
-        if (!allowedUsers.includes(currentUser)) return;
-      }
+  const { data } = await supabaseClient
+    .from("costs")
+    .select("*")
+    .eq("deleted", false)
+    .order("created_at", { ascending: false });
 
+  if (!data || data.length === 0) {
+    container.innerHTML = `<div class="text-center text-muted small p-3">Brak zarejestrowanych wydatków.</div>`;
+    return;
+  }
+
+  setupBorrowerSelectionUI();
+
+  const grouped = {};
+  data.forEach(c => {
+    if (c.is_private) {
+      const allowedUsers = [c.paid_by, malzenstwaMapa[c.paid_by]];
+      if (!allowedUsers.includes(currentUser)) return;
+    }
+
+    const dateKey = c.created_at.substring(0, 10);
+    if (!grouped[dateKey]) grouped[dateKey] = [];
+    grouped[dateKey].push(c);
+  });
+
+  const now = new Date().getTime();
+
+  Object.entries(grouped).forEach(([dateStr, items]) => {
+    const header = document.createElement("div");
+    header.className = "cost-date-header";
+    header.innerText = `📅 ${dateStr}`;
+    container.appendChild(header);
+
+    items.forEach(c => {
       const card = document.createElement("div");
       card.className = c.is_private ? "stado-card-private" : "stado-card";
+
+      const createdTime = new Date(c.created_at).getTime();
+      const isUnderOneMinute = (now - createdTime) < 60000;
+      const canDelete = isUnderOneMinute && (c.created_by === currentUserId || c.paid_by === currentUser);
+
       card.innerHTML = `
-        <div class="fw-bold">${c.is_private ? '🔒 [Prywatne] ' : ''}${c.cost_name}</div>
-        <div class="small text-muted">Płacił(a): <b>${c.paid_by}</b> dla: <b>${c.borrower}</b></div>
-        ${c.comment ? `<div class="small fst-italic text-secondary">${c.comment}</div>` : ''}
-        <div class="fw-bold text-end mt-1" style="color:var(--burgund);">${Number(c.amount).toFixed(2)} ${c.currency}</div>
+        <div class="d-flex justify-content-between align-items-start">
+          <div class="fw-bold">${c.is_private ? '🔒 [Prywatny] ' : ''}${c.cost_name}</div>
+          <div class="fw-bold fs-6" style="color:var(--burgund);">${Number(c.amount).toLocaleString('pl-PL', { minimumFractionDigits: 2 })} ${c.currency}</div>
+        </div>
+        <div class="small text-muted mt-1">
+          Płacił(a): <b>${c.paid_by}</b> ${c.is_private ? '' : `➔ Dla: <b>${c.borrower}</b>`}
+        </div>
+        ${c.comment ? `<div class="small fst-italic text-secondary mt-1">${c.comment}</div>` : ''}
+        ${canDelete ? `
+          <div class="text-end mt-2">
+            <button class="cost-delete-btn" onclick="window.usunWydatek(${c.id})">🗑️ Usuń (jeszcze przez chwilę)</button>
+          </div>
+        ` : ''}
       `;
       container.appendChild(card);
     });
-  }
+  });
 }
 
-document.getElementById("formCost").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const name = document.getElementById("costName").value.trim();
-  const amount = parseFloat(document.getElementById("costAmount").value);
-  const currency = document.getElementById("costCurrency").value;
-  const borrower = document.getElementById("costBorrower").value;
-  const comment = document.getElementById("costComment").value.trim();
-  const isPrivate = document.getElementById("costIsPrivate").checked;
+function setupBorrowerSelectionUI() {
+  const usersContainer = document.getElementById("borrowerUsersCheckboxes");
+  if (usersContainer && usersContainer.children.length === 0) {
+    Object.keys(ekipyMapa).sort().forEach(uName => {
+      const label = document.createElement("label");
+      label.className = "badge bg-white text-dark border p-1 small";
+      label.innerHTML = `<input type="checkbox" class="user-cb" value="${uName}"> ${uName}`;
+      usersContainer.appendChild(label);
+    });
+  }
 
-  if (!name || isNaN(amount) || amount <= 0) return;
+  const isPrivateCb = document.getElementById("costIsPrivate");
+  const wrapper = document.getElementById("costBorrowerWrapper");
+  if (isPrivateCb && wrapper) {
+    isPrivateCb.onchange = () => {
+      wrapper.style.display = isPrivateCb.checked ? "none" : "block";
+    };
+  }
 
-  await supabaseClient.from("costs").insert({
-    created_by: currentUserId,
-    paid_by: currentUser,
-    amount: amount,
-    currency: currency,
-    cost_name: name,
-    borrower: borrower,
-    comment: comment,
-    is_private: isPrivate
+  const rAll = document.getElementById("bModeAll");
+  const rTeams = document.getElementById("bModeTeams");
+  const rUsers = document.getElementById("bModeUsers");
+  const boxTeams = document.getElementById("boxBorrowerTeams");
+  const boxUsers = document.getElementById("boxBorrowerUsers");
+
+  const updateModeVisibility = () => {
+    if (boxTeams) boxTeams.style.display = (rTeams && rTeams.checked) ? "block" : "none";
+    if (boxUsers) boxUsers.style.display = (rUsers && rUsers.checked) ? "block" : "none";
+  };
+
+  [rAll, rTeams, rUsers].forEach(r => {
+    if (r) r.onchange = updateModeVisibility;
   });
+}
 
-  document.getElementById("formCost").reset();
+window.usunWydatek = async function(costId) {
+  if (!confirm("Czy na pewno chcesz usunąć ten wydatek?")) return;
+  await supabaseClient.from("costs").update({ deleted: true }).eq("id", costId);
   loadCosts();
-});
+  loadWallet();
+};
+
+const formCost = document.getElementById("formCost");
+if (formCost) {
+  formCost.onsubmit = async (e) => {
+    e.preventDefault();
+    const name = document.getElementById("costName").value.trim();
+    const amount = parseFloat(document.getElementById("costAmount").value);
+    const currency = document.getElementById("costCurrency").value;
+    const comment = document.getElementById("costComment").value.trim();
+    const isPrivate = document.getElementById("costIsPrivate").checked;
+
+    let borrower = "Całe Stado";
+    if (!isPrivate) {
+      const mode = document.querySelector("input[name='borrowerMode']:checked").value;
+      if (mode === "teams") {
+        const selTeams = Array.from(document.querySelectorAll(".team-cb:checked")).map(cb => cb.value);
+        if (selTeams.length === 0) {
+          alert("Wybierz przynajmniej jedną ekipę!");
+          return;
+        }
+        borrower = selTeams.join(", ");
+      } else if (mode === "users") {
+        const selUsers = Array.from(document.querySelectorAll(".user-cb:checked")).map(cb => cb.value);
+        if (selUsers.length === 0) {
+          alert("Wybierz przynajmniej jedną osobę!");
+          return;
+        }
+        borrower = selUsers.join(", ");
+      }
+    }
+
+    if (!name || isNaN(amount) || amount <= 0) return;
+
+    await supabaseClient.from("costs").insert({
+      created_by: currentUserId,
+      paid_by: currentUser,
+      amount: amount,
+      currency: currency,
+      cost_name: name,
+      borrower: isPrivate ? "Tylko dla mnie" : borrower,
+      comment: comment,
+      is_private: isPrivate,
+      settled_by: []
+    });
+
+    formCost.reset();
+    document.querySelectorAll(".team-cb, .user-cb").forEach(cb => cb.checked = false);
+    document.getElementById("bModeAll").checked = true;
+    document.getElementById("boxBorrowerTeams").style.display = "none";
+    document.getElementById("boxBorrowerUsers").style.display = "none";
+    document.getElementById("costBorrowerWrapper").style.display = "block";
+
+    loadCosts();
+    loadWallet();
+  };
+}
 
 // ==============================================================================
-// 6. MODUŁ: PORTFEL (ROZLICZENIA)
+// 6. MODUŁ: PORTFEL (SYNCHRONIZACJA DWUSTRONNA 1:1)
 // ==============================================================================
 async function loadWallet() {
-  const { data: listaW } = await supabaseClient.from("costs").select("*").eq("deleted", false);
+  const { data: listaW } = await supabaseClient
+    .from("costs")
+    .select("*")
+    .eq("deleted", false)
+    .eq("is_private", false);
+
   const oweContainer = document.getElementById("walletOweList");
   const dueContainer = document.getElementById("walletDueList");
   const summaryEl = document.getElementById("walletTotalSummary");
 
+  if (!oweContainer || !dueContainer) return;
+
   oweContainer.innerHTML = "";
   dueContainer.innerHTML = "";
 
-  let razemPln = 0.0;
+  let razemHuf = 0.0;
   const mamyOddac = [];
   const ktosZalega = [];
 
+  const ALL_TEAMS = ["Bobry", "Pakuły", "Robaki", "Sileziny"];
+
   if (listaW) {
     listaW.forEach(w => {
-      if (w.is_private) return;
-
       const kwota = parseFloat(w.amount);
       const wal = w.currency;
       const ktoPlacil = w.paid_by;
-      const teamPlacacy = ekipyMapa[ktoPlacil] || "Pakuły";
-      const dlaKogo = w.borrower;
-      const kursDoPln = bazaKursow[`${wal}_PLN`] || 1.0;
+      const teamPlacacy = ekipyMapa[ktoPlacil] || ktoPlacil;
+      const dlaKogoStr = (w.borrower || "Całe Stado").trim();
+      const settledArray = Array.isArray(w.settled_by) ? w.settled_by : [];
+      const kursDoHuf = bazaKursow[`${wal}_HUF`] || (wal === "HUF" ? 1.0 : (wal === "PLN" ? 85.2 : 368.0));
 
-      if (dlaKogo === "Całe Stado") {
-        const kosztNaGlowe = kwota / 15.0;
-        if (teamPlacacy === currentTeam) {
-          Object.entries(LICZBA_OSOB_W_EKIPIE).forEach(([tName, lOsob]) => {
-            if (tName === "Całe Stado" || tName === currentTeam) return;
-            const szczegol = lOsob * kosztNaGlowe;
-            ktosZalega.push(`🧾 ${tName} ➔ <b>${szczegol.toFixed(2)} ${wal}</b>`);
-            razemPln += (szczegol * kursDoPln);
-          });
+      // 1. SCENARIUSZ: CAŁE STADO (PODZIAŁ NA 4 EKIPY)
+      if (dlaKogoStr === "Całe Stado") {
+        const kwotaUlamka = kwota / 4.0;
+        const wartoscHuf = kwotaUlamka * kursDoHuf;
+
+        if (teamPlacacy !== currentTeam) {
+          // Nasza ekipa wisi płatnikowi 1/4
+          const czyRozliczone = settledArray.includes(currentTeam);
+          if (!czyRozliczone) razemHuf -= wartoscHuf;
+
+          mamyOddac.push(`
+            <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+              <div>
+                <span class="wallet-badge-fraction">1/4</span> Dla: <b>${ktoPlacil} (${teamPlacacy})</b> za <i>${w.cost_name}</i>:
+                <b class="${czyRozliczone ? 'text-decoration-line-through text-muted' : 'text-danger'} d-block">${kwotaUlamka.toFixed(2)} ${wal}</b>
+              </div>
+              <button class="btn btn-sm ${czyRozliczone ? 'btn-settled-yes' : 'btn-settled-no'}" onclick="window.oznaczRozliczenie(${w.id}, '${currentTeam}', ${!czyRozliczone})">
+                ${czyRozliczone ? '✓ Rozliczono' : '✕ Do rozliczenia'}
+              </button>
+            </div>
+          `);
         } else {
-          const ileUNas = LICZBA_OSOB_W_EKIPIE[currentTeam] || 4;
-          const szczegol = ileUNas * kosztNaGlowe;
-          mamyOddac.push(`🧾 ${teamPlacacy} ➔ <b>${szczegol.toFixed(2)} ${wal}</b>`);
-          razemPln -= (szczegol * kursDoPln);
+          // My płaciliśmy za Całe Stado - pozostałe 3 ekipy wiszą po 1/4
+          ALL_TEAMS.forEach(ekipa => {
+            if (ekipa === currentTeam) return;
+            const czyRozliczone = settledArray.includes(ekipa);
+            if (!czyRozliczone) razemHuf += wartoscHuf;
+
+            ktosZalega.push(`
+              <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                <div>
+                  <span class="wallet-badge-fraction">1/4</span> <b>${ekipa}</b> za <i>${w.cost_name}</i>:
+                  <b class="${czyRozliczone ? 'text-decoration-line-through text-muted' : 'text-success'} d-block">${kwotaUlamka.toFixed(2)} ${wal}</b>
+                </div>
+                <button class="btn btn-sm ${czyRozliczone ? 'btn-settled-yes' : 'btn-settled-no'}" onclick="window.oznaczRozliczenie(${w.id}, '${ekipa}', ${!czyRozliczone})">
+                  ${czyRozliczone ? '✓ Rozliczono' : '✕ Do rozliczenia'}
+                </button>
+              </div>
+            `);
+          });
         }
-      } else if (dlaKogo === currentTeam && teamPlacacy !== currentTeam) {
-        mamyOddac.push(`🧾 ${teamPlacacy} ➔ <b>${kwota.toFixed(2)} ${wal}</b>`);
-        razemPln -= (kwota * kursDoPln);
-      } else if (dlaKogo !== currentTeam && teamPlacacy === currentTeam) {
-        ktosZalega.push(`🧾 ${dlaKogo} ➔ <b>${kwota.toFixed(2)} ${wal}</b>`);
-        razemPln += (kwota * kursDoPln);
+      } 
+      // 2. SCENARIUSZ: WYBRANE EKIPY LUB OSOBY
+      else {
+        const targets = dlaKogoStr.split(",").map(s => s.trim());
+        const liczbaStron = targets.length + 1; // płatnik + wskazani dłużnicy
+        const kwotaUlamka = kwota / liczbaStron;
+        const fractionLabel = `1/${liczbaStron}`;
+        const wartoscHuf = kwotaUlamka * kursDoHuf;
+
+        targets.forEach(target => {
+          const teamTargetu = ekipyMapa[target] || target;
+          const czyToMyJestesmyDluznikiem = (target === currentUser || teamTargetu === currentTeam);
+          const czyToMyPlacilismy = (teamPlacacy === currentTeam || ktoPlacil === currentUser);
+
+          // Identyfikator relacji długu (zawsze nazwa wskazana w borrower)
+          const relacjaId = target;
+          const czyRozliczone = settledArray.includes(relacjaId) || settledArray.includes(teamTargetu) || settledArray.includes(target);
+
+          if (czyToMyJestesmyDluznikiem && !czyToMyPlacilismy) {
+            // My wisimy płatnikowi
+            if (!czyRozliczone) razemHuf -= wartoscHuf;
+
+            mamyOddac.push(`
+              <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                <div>
+                  <span class="wallet-badge-fraction">${fractionLabel}</span> Dla: <b>${ktoPlacil} (${teamPlacacy})</b> za <i>${w.cost_name}</i>:
+                  <b class="${czyRozliczone ? 'text-decoration-line-through text-muted' : 'text-danger'} d-block">${kwotaUlamka.toFixed(2)} ${wal}</b>
+                </div>
+                <button class="btn btn-sm ${czyRozliczone ? 'btn-settled-yes' : 'btn-settled-no'}" onclick="window.oznaczRozliczenie(${w.id}, '${relacjaId}', ${!czyRozliczone})">
+                  ${czyRozliczone ? '✓ Rozliczono' : '✕ Do rozliczenia'}
+                </button>
+              </div>
+            `);
+          } else if (czyToMyPlacilismy && !czyToMyJestesmyDluznikiem) {
+            // Ktoś wisi nam
+            if (!czyRozliczone) razemHuf += wartoscHuf;
+
+            ktosZalega.push(`
+              <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                <div>
+                  <span class="wallet-badge-fraction">${fractionLabel}</span> <b>${target}</b> za <i>${w.cost_name}</i>:
+                  <b class="${czyRozliczone ? 'text-decoration-line-through text-muted' : 'text-success'} d-block">${kwotaUlamka.toFixed(2)} ${wal}</b>
+                </div>
+                <button class="btn btn-sm ${czyRozliczone ? 'btn-settled-yes' : 'btn-settled-no'}" onclick="window.oznaczRozliczenie(${w.id}, '${relacjaId}', ${!czyRozliczone})">
+                  ${czyRozliczone ? '✓ Rozliczono' : '✕ Do rozliczenia'}
+                </button>
+              </div>
+            `);
+          }
+        });
       }
     });
   }
 
-  oweContainer.innerHTML = mamyOddac.length ? mamyOddac.join("<br>") : "<i>Czysto! Nie macie zaległości.</i>";
-  dueContainer.innerHTML = ktosZalega.length ? ktosZalega.join("<br>") : "<i>Brak zaległości ze strony innych ekip.</i>";
+  oweContainer.innerHTML = mamyOddac.length ? mamyOddac.join("") : "<div class='text-muted small'>Czysto! Brak zaległości.</div>";
+  dueContainer.innerHTML = ktosZalega.length ? ktosZalega.join("") : "<div class='text-muted small'>Brak zaległości ze strony innych.</div>";
 
-  summaryEl.innerText = `${razemPln >= 0 ? '+ ' : '- '}${Math.abs(razemPln).toFixed(2)} PLN`;
-  summaryEl.style.color = razemPln >= 0 ? "green" : "red";
+  summaryEl.innerText = `${razemHuf >= 0 ? '+ ' : '- '}${Math.round(Math.abs(razemHuf)).toLocaleString('pl-PL')} HUF`;
+  summaryEl.style.color = razemHuf >= 0 ? "green" : "red";
 }
 
+window.oznaczRozliczenie = async function(costId, entityKey, markAsSettled) {
+  const { data } = await supabaseClient.from("costs").select("settled_by").eq("id", costId).single();
+  let currentSettled = (data && Array.isArray(data.settled_by)) ? [...data.settled_by] : [];
+
+  if (markAsSettled) {
+    if (!currentSettled.includes(entityKey)) currentSettled.push(entityKey);
+  } else {
+    currentSettled = currentSettled.filter(x => x !== entityKey);
+  }
+
+  await supabaseClient.from("costs").update({ settled_by: currentSettled }).eq("id", costId);
+  loadWallet();
+};
+
 // ==============================================================================
-// 7. MODUŁ: ZAKUPY
+// 7. MODUŁ: ZAKUPY (NUMERACJA OD 1, ENTER, BLOKADA NOWEJ LISTY)
 // ==============================================================================
+let currentActiveShoppingListId = null;
+
 async function loadShoppingLists() {
   const select = document.getElementById("shoppingListSelect");
+  const btnNew = document.getElementById("btnNewShoppingList");
+  if (!select) return;
   select.innerHTML = "";
-  const { data } = await supabaseClient.from("shoppinglists").select("*").order("created_at", { ascending: false });
+
+  await populateShoppingSuggestions();
+
+  const { data } = await supabaseClient
+    .from("shoppinglists")
+    .select("*")
+    .order("id", { ascending: true }); // Rosnąco dla naturalnej numeracji 1, 2, 3...
 
   if (data && data.length > 0) {
-    data.forEach(l => {
+    const hasUnclosed = data.some(l => !l.closed);
+    if (btnNew) btnNew.style.display = hasUnclosed ? "none" : "block";
+
+    // Wyświetlamy najnowszą na górze selecta, ale z numerem sekwencyjnym
+    const reversed = [...data].reverse();
+    reversed.forEach((l) => {
+      const seqIndex = data.indexOf(l) + 1;
       const opt = document.createElement("option");
       opt.value = l.id;
-      opt.innerText = `Lista #${l.id} (${l.created_at.substring(0, 16).replace('T', ' ')})`;
+      opt.setAttribute("data-seq", seqIndex);
+      const dataStr = l.created_at.substring(0, 10);
+      opt.innerText = `Lista #${seqIndex} - ${dataStr} ${l.closed ? '(Zamknięta)' : '🟢 W toku'}`;
       select.appendChild(opt);
     });
-    select.onchange = () => loadShoppingItems(select.value);
-    loadShoppingItems(data[0].id);
+
+    select.onchange = () => switchShoppingList(select.value);
+    switchShoppingList(reversed[0].id);
+  } else {
+    if (btnNew) btnNew.style.display = "block";
+    const { data: newList } = await supabaseClient.from("shoppinglists").insert({ created_by: currentUserId, closed: false }).select().single();
+    if (newList) loadShoppingLists();
   }
 }
 
-async function loadShoppingItems(listId) {
-  const container = document.getElementById("shoppingItemsList");
-  container.innerHTML = "";
-  const { data } = await supabaseClient.from("shoppingitems").select("*").eq("list_id", listId).order("created_at");
+async function populateShoppingSuggestions() {
+  const datalist = document.getElementById("productSuggestions");
+  if (!datalist) return;
+  datalist.innerHTML = "";
 
+  const { data } = await supabaseClient.from("shoppingitems").select("product_name");
   if (data) {
-    data.forEach(it => {
-      const li = document.createElement("li");
-      li.className = "list-group-item d-flex justify-content-between align-items-center";
-      li.innerHTML = `
-        <span>${it.bought ? `<s>${it.product_name}</s>` : it.product_name}</span>
-        <input type="checkbox" class="form-check-input" ${it.bought ? 'checked' : ''}>
-      `;
-      li.querySelector("input").onchange = async (e) => {
-        await supabaseClient.from("shoppingitems").update({ bought: e.target.checked }).eq("id", it.id);
-        loadShoppingItems(listId);
-      };
-      container.appendChild(li);
+    const unikalne = [...new Set(data.map(i => i.product_name))].sort();
+    unikalne.forEach(prod => {
+      const opt = document.createElement("option");
+      opt.value = prod;
+      datalist.appendChild(opt);
     });
   }
 }
 
-document.getElementById("btnNewShoppingList").onclick = async () => {
-  await supabaseClient.from("shoppinglists").insert({ created_by: currentUserId });
-  loadShoppingLists();
+async function switchShoppingList(listId) {
+  currentActiveShoppingListId = listId;
+  const { data: listData } = await supabaseClient.from("shoppinglists").select("*").eq("id", listId).single();
+  const isClosed = listData ? listData.closed : false;
+
+  const controls = document.getElementById("activeListControls");
+  const closedBadge = document.getElementById("closedListBadge");
+
+  if (controls && closedBadge) {
+    controls.style.display = isClosed ? "none" : "block";
+    closedBadge.style.display = isClosed ? "block" : "none";
+  }
+
+  loadShoppingItems(listId, isClosed);
+}
+
+async function loadShoppingItems(listId, isClosed) {
+  const container = document.getElementById("shoppingItemsList");
+  if (!container) return;
+  container.innerHTML = "";
+
+  const { data } = await supabaseClient
+    .from("shoppingitems")
+    .select("*")
+    .eq("list_id", listId)
+    .order("id");
+
+  if (data && data.length > 0) {
+    let unboughtCount = 0;
+
+    data.forEach(it => {
+      if (!it.bought) unboughtCount++;
+      const li = document.createElement("li");
+      li.className = "list-group-item d-flex justify-content-between align-items-center py-2";
+      li.innerHTML = `
+        <span class="${it.bought ? 'shopping-item-bought' : 'fw-bold'}">${it.product_name}</span>
+        <div class="d-flex align-items-center gap-2">
+          <input type="checkbox" class="form-check-input" ${it.bought ? 'checked' : ''} ${isClosed ? 'disabled' : ''}>
+          ${!isClosed ? `<button class="btn btn-sm btn-outline-danger py-0 px-2" style="font-size: 11px;" onclick="window.usunProduktZListy(${it.id})">✕</button>` : ''}
+        </div>
+      `;
+
+      const check = li.querySelector("input");
+      if (!isClosed) {
+        check.onchange = async (e) => {
+          const isNowBought = e.target.checked;
+          await supabaseClient.from("shoppingitems").update({ bought: isNowBought }).eq("id", it.id);
+          
+          if (isNowBought && unboughtCount === 1) {
+            otworzModalZakonczenia();
+          } else {
+            loadShoppingItems(listId, isClosed);
+          }
+        };
+      }
+
+      container.appendChild(li);
+    });
+  } else {
+    container.innerHTML = `<li class="list-group-item text-center text-muted small py-3">Lista jest pusta. Wpisz produkt powyżej.</li>`;
+  }
+}
+
+window.usunProduktZListy = async function(itemId) {
+  await supabaseClient.from("shoppingitems").delete().eq("id", itemId);
+  loadShoppingItems(currentActiveShoppingListId, false);
 };
 
-document.getElementById("btnAddProduct").onclick = async () => {
+const btnNewList = document.getElementById("btnNewShoppingList");
+if (btnNewList) {
+  btnNewList.onclick = async () => {
+    await supabaseClient.from("shoppinglists").insert({ created_by: currentUserId, closed: false });
+    loadShoppingLists();
+  };
+}
+
+async function handleAddProduct() {
   const input = document.getElementById("newProductInput");
-  const listId = document.getElementById("shoppingListSelect").value;
-  if (!input.value.trim() || !listId) return;
+  if (!input || !input.value.trim() || !currentActiveShoppingListId) return;
 
-  await supabaseClient.from("shoppingitems").insert({ list_id: listId, product_name: input.value.trim(), bought: false });
+  await supabaseClient.from("shoppingitems").insert({
+    list_id: currentActiveShoppingListId,
+    product_name: input.value.trim(),
+    bought: false
+  });
   input.value = "";
-  loadShoppingItems(listId);
-};
+  input.focus();
+  loadShoppingItems(currentActiveShoppingListId, false);
+  populateShoppingSuggestions();
+}
 
+const btnAddProd = document.getElementById("btnAddProduct");
+if (btnAddProd) {
+  btnAddProd.onclick = handleAddProduct;
+}
+
+const prodInput = document.getElementById("newProductInput");
+if (prodInput) {
+  prodInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleAddProduct();
+    }
+  });
+}
+
+function otworzModalZakonczenia() {
+  const modalEl = document.getElementById("modalFinishShopping");
+  if (modalEl) {
+    const modal = new bootstrap.Modal(modalEl);
+    modal.show();
+  }
+}
+
+const btnFinishManual = document.getElementById("btnFinishShoppingManual");
+if (btnFinishManual) {
+  btnFinishManual.onclick = otworzModalZakonczenia;
+}
+
+const formFinish = document.getElementById("formFinishShopping");
+if (formFinish) {
+  formFinish.onsubmit = async (e) => {
+    e.preventDefault();
+    const amount = parseFloat(document.getElementById("finishAmount").value);
+    const currency = document.getElementById("finishCurrency").value;
+    const borrower = document.getElementById("finishBorrower").value;
+    const comment = document.getElementById("finishComment").value.trim();
+
+    if (isNaN(amount) || amount <= 0 || !currentActiveShoppingListId) return;
+
+    // 1. Zamknięcie listy
+    await supabaseClient.from("shoppinglists").update({ closed: true }).eq("id", currentActiveShoppingListId);
+
+    const select = document.getElementById("shoppingListSelect");
+    const seqNum = select.options[select.selectedIndex].getAttribute("data-seq") || "1";
+    const dataStr = new Date().toISOString().substring(0, 10);
+
+    // Przypadek graniczny: zakup tylko dla własnej ekipy -> wydatek prywatny
+    const isOnlyForMyTeam = (borrower === currentTeam);
+
+    // 2. Wpis do costs
+    await supabaseClient.from("costs").insert({
+      created_by: currentUserId,
+      paid_by: currentUser,
+      amount: amount,
+      currency: currency,
+      cost_name: `Zakupy: Lista #${seqNum} - ${dataStr}`,
+      borrower: isOnlyForMyTeam ? "Tylko dla mnie" : borrower,
+      comment: comment,
+      is_private: isOnlyForMyTeam,
+      settled_by: []
+    });
+
+    const modalEl = document.getElementById("modalFinishShopping");
+    const modal = bootstrap.Modal.getInstance(modalEl);
+    if (modal) modal.hide();
+
+    loadShoppingLists();
+    loadCosts();
+    loadWallet();
+  };
+}
 // ==============================================================================
 // 8. MODUŁ: PŁACIMY RAZEM, KANTOR I FORUM
 // ==============================================================================
