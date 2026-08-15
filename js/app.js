@@ -240,8 +240,10 @@ function switchTab(tabName) {
 
   // Zamknij sidebar jeśli otwarty
   const offcanvasEl = document.getElementById('sidebarMenu');
-  const offcanvas = bootstrap.Offcanvas.getInstance(offcanvasEl);
-  if (offcanvas) offcanvas.hide();
+  if (offcanvasEl && typeof bootstrap !== 'undefined') {
+    const offcanvas = bootstrap.Offcanvas.getInstance(offcanvasEl);
+    if (offcanvas) offcanvas.hide();
+  }
 
   // Dopasowanie i pokazanie wybranej sekcji
   if (tabName === "dashboard" || tabName.includes("Pulpit")) {
@@ -261,9 +263,13 @@ function switchTab(tabName) {
   } else if (tabName.includes("Zakupy")) {
     document.getElementById("tab-shopping").style.display = "block";
     loadShoppingLists();
-  } else if (tabName.includes("Płacimy Razem")) {
-    document.getElementById("tab-tickets").style.display = "block";
-    przeliczBilety();
+  } else if (tabName.includes("bilety") || tabName.includes("Bilety") || tabName.includes("Płacimy") || tabName === "calc") {
+    // Poprawne ID: tab-calc
+    const tabCalc = document.getElementById("tab-calc");
+    if (tabCalc) {
+      tabCalc.style.display = "block";
+      przeliczBilety();
+    }
   } else if (tabName.includes("Kantor")) {
     document.getElementById("tab-exchange").style.display = "block";
     przeliczKantor();
@@ -1131,9 +1137,9 @@ function przeliczBilety() {
   out.innerHTML = `
     <h5 class="fw-bold" style="color:var(--burgund);">Razem: ${total.toFixed(2)} ${wal}</h5>
     <ul class="list-unstyled small mb-0 mt-2">
-      <li>🦫 <b>Bobry (3 os.):</b> ${bKoszt.toFixed(2)} ${wal}</li>
+      <li>🐗 <b>Bobry (3 os.):</b> ${bKoszt.toFixed(2)} ${wal}</li>
       <li>🐱 <b>Pakuły (4 os.):</b> ${pKoszt.toFixed(2)} ${wal}</li>
-      <li>🪱 <b>Robaki (4 os.):</b> ${rKoszt.toFixed(2)} ${wal}</li>
+      <li>🐛 <b>Robaki (4 os.):</b> ${rKoszt.toFixed(2)} ${wal}</li>
       <li>🐿️ <b>Sileziny (4 os.):</b> ${sKoszt.toFixed(2)} ${wal}</li>
     </ul>
   `;
