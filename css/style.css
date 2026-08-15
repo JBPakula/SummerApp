@@ -442,3 +442,82 @@ html, body {
   background: #FFFFFF;
   border: 1px solid #E2E8F0;
 }
+
+/* --- FORUM KLASYCZNE --- */
+.forum-topic-item {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.forum-topic-item:hover {
+  background-color: #f8fafc;
+}
+
+.forum-post-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.forum-post-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #f1f5f9;
+  padding-bottom: 6px;
+  margin-bottom: 8px;
+  font-size: 0.8rem;
+}
+
+.forum-post-body {
+  font-size: 0.92rem;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+#forumPostEditor:empty:before {
+  content: attr(placeholder);
+  color: #94a3b8;
+}
+
+/* Miniaturki awatarów na forum */
+.forum-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1.5px solid var(--burgund);
+  vertical-align: middle;
+}
+
+.forum-avatar-placeholder {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background-color: #f1f5f9;
+  color: var(--burgund);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+  border: 1.5px solid var(--burgund);
+  vertical-align: middle;
+}
+
+
+.forum-editor-box {
+  min-height: 80px;
+  max-height: 180px;
+  overflow-y: auto;
+  font-size: 0.9rem;
+}
+
+.forum-editor-box:empty:before {
+  content: attr(placeholder);
+  color: #94a3b8;
+}

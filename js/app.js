@@ -34,6 +34,10 @@ async function initApp() {
   await pobierzUzytkownikowIMalzenstwa();
   await checkAuth();
   setupEventListeners();
+
+  // Przywracanie ostatnio otwartej zakładki po odświeżeniu (lub Pulpit jako domyślny)
+  const lastTab = localStorage.getItem("active_tab") || "dashboard";
+  switchTab(lastTab);
 }
 
 // Bezpieczny start: odpala od razu, jeśli DOM jest już gotowy
@@ -167,9 +171,11 @@ async function verifyAndLogin(userName, password) {
     tryLoadAvatar();
 
 renderNavigation();
-    switchTab('dashboard'); // Aktywuje widok kafelków i pulpitu
     initMap();
     loadCosts();
+// Sprawdzamy, czy użytkownik ma zapisaną zakładkę – jeśli tak, przywracamy ją, w przeciwnym razie dashboard
+    const savedTab = localStorage.getItem("active_tab") || "dashboard";
+    switchTab(savedTab);
     return true;
   } catch (e) {
     console.error("Wyjątek podczas autoryzacji:", e);
@@ -233,8 +239,10 @@ function renderNavigation() {
     container.appendChild(btn);
   });
 }
-
 function switchTab(tabName) {
+  // Zapisz aktualną zakładkę w pamięci przeglądarki
+  localStorage.setItem("active_tab", tabName);
+
   // Ukryj wszystkie sekcje
   document.querySelectorAll(".app-tab").forEach(el => el.style.display = "none");
 
@@ -1539,22 +1547,437 @@ function renderCheatsheet(from, to, rate) {
   }).join("");
 }
 
-async function loadForum() {
-    const container = document.getElementById("forumMessages");
-  if (!container) return;
-  container.innerHTML = "";
-  const { data } = await supabaseClient.from("forum").select("comment, created_by, users(login)").order("created_at", { ascending: false });
+// ==============================================================================
+// 8. MODUŁ: FORUM DYSKUSYJNE (Z PAMIĘCIĄ SESJI I AKCJAMI W WĄTKU)
+// ==============================================================================
+let currentTopicId = null;
+let currentTopicIsArchived = false;
+let forumUsersMap = {};
 
-  if (data) {
-    data.forEach(f => {
-      const author = (f.users && f.users.login) ? f.users.login : "Ekipa";
-      const bubble = document.createElement("div");
-      bubble.className = `chat-bubble ${author === currentUser ? 'chat-bubble-sent' : 'chat-bubble-received'}`;
-      bubble.innerHTML = `<div class="fw-bold small" style="color:var(--burgund);">${author}</div><div>${f.comment}</div>`;
-      container.appendChild(bubble);
-    });
+function renderAvatarHtml(login) {
+  if (!login) return `<span class="forum-avatar-placeholder me-2">👤</span>`;
+  const cleanLogin = login.trim();
+  const fallbackUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(cleanLogin)}&background=4A1525&color=fff&size=64`;
+
+  return `
+    <img src="assets/avatars/${cleanLogin}.jpg" 
+         class="forum-avatar me-2" 
+         alt="${cleanLogin}" 
+         onerror="if(this.src.endsWith('.jpg')){ this.src='assets/avatars/${cleanLogin}.jpeg'; } else if(this.src.endsWith('.jpeg')){ this.src='assets/avatars/${cleanLogin}.png'; } else { this.onerror=null; this.src='${fallbackUrl}'; }">
+  `;
+}
+
+function formatTopicDoc(cmd, value = null) {
+  document.execCommand(cmd, false, value);
+  const el = document.getElementById("newTopicFirstPost");
+  if (el) el.focus();
+}
+
+function formatReplyDoc(cmd, value = null) {
+  document.execCommand(cmd, false, value);
+  const el = document.getElementById("forumPostEditor");
+  if (el) el.focus();
+}
+
+async function pobierzUzytkownikowForum() {
+  if (Object.keys(forumUsersMap).length === 0) {
+    const { data: users } = await supabaseClient.from("users").select("id, login");
+    if (users) {
+      users.forEach(u => {
+        forumUsersMap[u.id] = u.login;
+      });
+    }
   }
 }
+
+// Główna funkcja wywoływana przy wejściu w zakładkę Forum
+async function loadForum() {
+  await pobierzUzytkownikowForum();
+
+  // Sprawdzamy, czy użytkownik był wcześniej w konkretnym wątku
+  const savedTopicId = localStorage.getItem("forum_active_topic_id");
+  if (savedTopicId) {
+    await openTopicById(parseInt(savedTopicId, 10));
+  } else {
+    showTopicsList();
+  }
+}
+
+// Powrót do listy wątków
+function showTopicsList() {
+  currentTopicId = null;
+  localStorage.removeItem("forum_active_topic_id");
+
+  const v1 = document.getElementById("forumTopicsView");
+  const v2 = document.getElementById("forumSingleTopicView");
+  if (v1 && v2) {
+    v1.style.display = "block";
+    v2.style.display = "none";
+  }
+  loadTopics();
+}
+
+// Rozwijanie / zwijanie archiwum
+window.toggleArchivedTopics = function() {
+  const list = document.getElementById("forumArchivedTopicsList");
+  const icon = document.getElementById("iconArchivedToggle");
+  if (!list) return;
+  const isHidden = list.style.display === "none";
+  list.style.display = isHidden ? "block" : "none";
+  if (icon) icon.className = isHidden ? "bi bi-chevron-up text-muted" : "bi bi-chevron-down text-muted";
+};
+
+// 1. Pobieranie listy wątków
+async function loadTopics() {
+  const activeContainer = document.getElementById("forumTopicsList");
+  const archivedContainer = document.getElementById("forumArchivedTopicsList");
+  if (!activeContainer || !archivedContainer) return;
+
+  activeContainer.innerHTML = "<div class='text-muted small py-2'>Ładowanie wątków...</div>";
+  archivedContainer.innerHTML = "<div class='text-muted small py-2'>Ładowanie archiwum...</div>";
+
+  await pobierzUzytkownikowForum();
+
+  const { data: topics, error } = await supabaseClient
+    .from("forum_topics")
+    .select("*")
+    .eq("deleted", false)
+    .order("created_at", { ascending: false });
+
+  if (error || !topics) {
+    activeContainer.innerHTML = `<div class='text-danger small py-2'>Błąd: ${error ? error.message : ''}</div>`;
+    return;
+  }
+
+  const { data: allPosts } = await supabaseClient.from("forum").select("topic_id").eq("deleted", false);
+
+  const activeTopics = topics.filter(t => !t.is_archived);
+  const archivedTopics = topics.filter(t => t.is_archived);
+
+  // Aktywne
+  if (activeTopics.length === 0) {
+    activeContainer.innerHTML = "<div class='text-muted small py-2'>Brak aktywnych wątków. Załóż temat powyżej!</div>";
+  } else {
+    activeContainer.innerHTML = activeTopics.map(t => renderSingleTopicItem(t, allPosts, false)).join("");
+  }
+
+  // Archiwalne
+  if (archivedTopics.length === 0) {
+    archivedContainer.innerHTML = "<div class='text-muted small py-2'>Brak zarchiwizowanych wątków.</div>";
+  } else {
+    archivedContainer.innerHTML = archivedTopics.map(t => renderSingleTopicItem(t, allPosts, true)).join("");
+  }
+}
+
+// Szablon wątku na liście
+function renderSingleTopicItem(t, allPosts, isArchived) {
+  const author = forumUsersMap[t.created_by] || "Uczestnik";
+  const avatar = renderAvatarHtml(author);
+  const count = allPosts ? allPosts.filter(p => p.topic_id === t.id).length : 0;
+  const dateObj = new Date(t.created_at);
+  const date = dateObj.toLocaleString("pl-PL", {
+    day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit"
+  });
+  
+  const diffSec = (new Date() - dateObj) / 1000;
+  const isAuthor = (t.created_by == currentUserId || (currentUser && author.toLowerCase() === currentUser.toLowerCase()));
+
+  let actionBtnHtml = "";
+  if (isAuthor) {
+    if (diffSec <= 60 && !isArchived) {
+      actionBtnHtml = `
+        <button class="btn btn-sm btn-outline-danger py-0 px-2 mt-1" 
+                style="font-size: 11px; white-space: nowrap;" 
+                onclick="event.stopPropagation(); deleteTopic(${t.id})">
+          🗑️ Usuń (${Math.max(0, Math.round(60 - diffSec))}s)
+        </button>
+      `;
+    } else if (!isArchived) {
+      actionBtnHtml = `
+        <button class="btn btn-sm btn-outline-secondary py-0 px-2 mt-1" 
+                style="font-size: 11px; white-space: nowrap;" 
+                onclick="event.stopPropagation(); archiveTopic(${t.id}, true)">
+          📦 Archiwizuj
+        </button>
+      `;
+    } else {
+      actionBtnHtml = `
+        <button class="btn btn-sm btn-outline-success py-0 px-2 mt-1" 
+                style="font-size: 11px; white-space: nowrap;" 
+                onclick="event.stopPropagation(); archiveTopic(${t.id}, false)">
+          🔄 Przywróć
+        </button>
+      `;
+    }
+  }
+
+  return `
+    <div class="forum-topic-item border-bottom mb-2 p-2 ${isArchived ? 'bg-light opacity-75' : ''}" onclick="openTopicById(${t.id})" style="cursor: pointer;">
+      <div class="d-flex justify-content-between align-items-start">
+        <div class="pe-2">
+          <div class="fw-bold" style="color: var(--burgund); font-size: 1rem; word-break: break-word;">${t.title}</div>
+          <div class="small text-muted mt-2 d-flex align-items-center">
+            ${avatar}
+            <span><b>${author}</b> &bull; ${date}</span>
+          </div>
+        </div>
+        <div class="d-flex flex-column align-items-end flex-shrink-0 ms-2">
+          <span class="badge bg-light text-dark border">💬 ${count}</span>
+          ${actionBtnHtml}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// Rozwijanie / zwijanie formularza nowego wątku
+window.toggleNewTopicForm = function() {
+  const formBox = document.getElementById("newTopicFormCollapse");
+  const icon = document.getElementById("iconNewTopicToggle");
+  if (!formBox) return;
+
+  const isHidden = formBox.style.display === "none";
+  formBox.style.display = isHidden ? "block" : "none";
+  if (icon) {
+    icon.className = isHidden ? "bi bi-chevron-up text-muted" : "bi bi-chevron-down text-muted";
+  }
+};
+
+function showTopicsList() {
+  currentTopicId = null;
+  localStorage.removeItem("forum_active_topic_id");
+
+  // Domyślnie zwiń formularz nowego wątku
+  const formBox = document.getElementById("newTopicFormCollapse");
+  const icon = document.getElementById("iconNewTopicToggle");
+  if (formBox) formBox.style.display = "none";
+  if (icon) icon.className = "bi bi-chevron-down text-muted";
+
+  const v1 = document.getElementById("forumTopicsView");
+  const v2 = document.getElementById("forumSingleTopicView");
+  if (v1 && v2) {
+    v1.style.display = "block";
+    v2.style.display = "none";
+  }
+  loadTopics();
+}
+
+// 2. Tworzenie nowego wątku
+const btnCreateTopic = document.getElementById("btnCreateTopic");
+if (btnCreateTopic) {
+  btnCreateTopic.onclick = async () => {
+    const titleInput = document.getElementById("newTopicTitle");
+    const firstPostInput = document.getElementById("newTopicFirstPost");
+    const title = titleInput.value.trim();
+    const firstPostContent = firstPostInput.innerHTML.trim();
+
+    if (!title || !firstPostContent || firstPostContent === "<br>") {
+      alert("Wpisz tytuł i treść pierwszej wiadomości!");
+      return;
+    }
+
+    btnCreateTopic.disabled = true;
+
+    const { data: topicData, error } = await supabaseClient
+      .from("forum_topics")
+      .insert({
+        title: title,
+        created_by: currentUserId,
+        is_archived: false,
+        deleted: false
+      })
+      .select().single();
+
+    if (!error && topicData) {
+      await supabaseClient.from("forum").insert({
+        topic_id: topicData.id,
+        comment: firstPostContent,
+        created_by: currentUserId,
+        deleted: false
+      });
+
+      titleInput.value = "";
+      firstPostInput.innerHTML = "";
+      btnCreateTopic.disabled = false;
+      openTopicById(topicData.id);
+    } else {
+      btnCreateTopic.disabled = false;
+      alert("Błąd podczas tworzenia wątku.");
+    }
+  };
+}
+
+// 3. Otwieranie konkretnego wątku (zapisuje stan i generuje akcje w nagłówku)
+async function openTopicById(topicId) {
+  currentTopicId = parseInt(topicId, 10);
+  localStorage.setItem("forum_active_topic_id", currentTopicId);
+
+  await pobierzUzytkownikowForum();
+
+  // Pobieramy dane wątku z bazy
+  const { data: topic, error } = await supabaseClient
+    .from("forum_topics")
+    .select("*")
+    .eq("id", currentTopicId)
+    .single();
+
+  if (error || !topic || topic.deleted) {
+    showTopicsList();
+    return;
+  }
+
+  currentTopicIsArchived = topic.is_archived;
+
+  document.getElementById("forumTopicsView").style.display = "none";
+  document.getElementById("forumSingleTopicView").style.display = "block";
+
+  // Renderowanie nagłówka wraz z przyciskiem akcji
+  const titleEl = document.getElementById("activeTopicTitle");
+  if (titleEl) {
+    const diffSec = (new Date() - new Date(topic.created_at)) / 1000;
+    const author = forumUsersMap[topic.created_by] || "";
+    const isAuthor = (topic.created_by == currentUserId || (currentUser && author.toLowerCase() === currentUser.toLowerCase()));
+
+    let headerAction = "";
+    if (isAuthor) {
+      if (diffSec <= 60 && !topic.is_archived) {
+        headerAction = `<button class="btn btn-sm btn-outline-danger py-0 px-2 ms-2" style="font-size: 11px;" onclick="deleteTopic(${topic.id})">🗑️ Usuń wątek</button>`;
+      } else if (!topic.is_archived) {
+        headerAction = `<button class="btn btn-sm btn-outline-secondary py-0 px-2 ms-2" style="font-size: 11px;" onclick="archiveTopic(${topic.id}, true)">📦 Archiwizuj wątek</button>`;
+      } else {
+        headerAction = `<button class="btn btn-sm btn-outline-success py-0 px-2 ms-2" style="font-size: 11px;" onclick="archiveTopic(${topic.id}, false)">🔄 Przywróć wątek</button>`;
+      }
+    }
+
+    titleEl.innerHTML = `
+      <span>${topic.title}</span>
+      ${topic.is_archived ? ' <span class="badge bg-secondary ms-1">Archiwum</span>' : ''}
+      ${headerAction}
+    `;
+  }
+
+  const editorCard = document.getElementById("forumPostEditor")?.closest(".card");
+  if (editorCard) {
+    editorCard.style.display = topic.is_archived ? "none" : "block";
+  }
+
+  const editor = document.getElementById("forumPostEditor");
+  if (editor) editor.innerHTML = "";
+
+  await loadPosts(currentTopicId);
+}
+
+// 4. Ładowanie postów
+async function loadPosts(topicId) {
+  const container = document.getElementById("forumPostsList");
+  if (!container) return;
+
+  const parsedId = parseInt(topicId, 10);
+  container.innerHTML = "<div class='text-muted small py-2'>Ładowanie odpowiedzi...</div>";
+
+  await pobierzUzytkownikowForum();
+
+  const { data: posts, error } = await supabaseClient
+    .from("forum")
+    .select("id, comment, created_at, created_by")
+    .eq("topic_id", parsedId)
+    .eq("deleted", false)
+    .order("created_at", { ascending: true });
+
+  if (error || !posts || posts.length === 0) {
+    container.innerHTML = "<div class='text-muted small py-3 text-center'>Brak odpowiedzi w tym wątku.</div>";
+    return;
+  }
+
+  container.innerHTML = posts.map(p => {
+    const author = forumUsersMap[p.created_by] || "Uczestnik";
+    const avatar = renderAvatarHtml(author);
+    const dateObj = new Date(p.created_at);
+    const date = dateObj.toLocaleString("pl-PL", {
+      day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit"
+    });
+
+    const diffSec = (new Date() - dateObj) / 1000;
+    const isAuthor = (p.created_by == currentUserId || (currentUser && author.toLowerCase() === currentUser.toLowerCase()));
+
+    let deleteBtn = "";
+    if (isAuthor && diffSec <= 60 && !currentTopicIsArchived) {
+      deleteBtn = `<button class="btn btn-sm btn-outline-danger py-0 px-1 ms-2" style="font-size: 10px;" onclick="deletePost(${p.id})">🗑️ Usuń (${Math.max(0, Math.round(60 - diffSec))}s)</button>`;
+    }
+
+    return `
+      <div class="forum-post-card shadow-sm mb-3 p-3 bg-white rounded-3 border">
+        <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-2">
+          <div class="d-flex align-items-center">
+            ${avatar}
+            <b style="color: var(--burgund); font-size: 0.95rem;">${author}</b>
+          </div>
+          <div class="d-flex align-items-center">
+            <span class="text-muted small" style="font-size: 11px;">${date}</span>
+            ${deleteBtn}
+          </div>
+        </div>
+        <div class="forum-post-body" style="font-size: 0.92rem; line-height: 1.5;">
+          ${p.comment}
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+// 5. Publikacja odpowiedzi
+const btnSendPost = document.getElementById("btnSendPost");
+if (btnSendPost) {
+  btnSendPost.onclick = async () => {
+    const editor = document.getElementById("forumPostEditor");
+    const content = editor.innerHTML.trim();
+    if (!content || content === "<br>" || !currentTopicId) return;
+
+    btnSendPost.disabled = true;
+    const { error } = await supabaseClient.from("forum").insert({
+      topic_id: parseInt(currentTopicId, 10),
+      comment: content,
+      created_by: currentUserId,
+      deleted: false
+    });
+
+    btnSendPost.disabled = false;
+    if (!error) {
+      editor.innerHTML = "";
+      await loadPosts(currentTopicId);
+      window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+    } else {
+      alert("Błąd publikacji: " + error.message);
+    }
+  };
+}
+
+// 6. Akcje
+window.deleteTopic = async function(topicId) {
+  if (!confirm("Czy na pewno chcesz usunąć ten wątek?")) return;
+  await supabaseClient.from("forum_topics").update({ deleted: true }).eq("id", parseInt(topicId, 10));
+  showTopicsList();
+};
+
+window.archiveTopic = async function(topicId, archive) {
+  const actionText = archive ? "zarchiwizować" : "przywrócić z archiwum";
+  if (!confirm(`Czy na pewno chcesz ${actionText} ten wątek?`)) return;
+
+  await supabaseClient.from("forum_topics").update({ is_archived: archive }).eq("id", parseInt(topicId, 10));
+  
+  if (currentTopicId) {
+    openTopicById(topicId);
+  } else {
+    loadTopics();
+  }
+};
+
+window.deletePost = async function(postId) {
+  if (!confirm("Czy na pewno chcesz usunąć tę wiadomość?")) return;
+  await supabaseClient.from("forum").update({ deleted: true }).eq("id", parseInt(postId, 10));
+  if (currentTopicId) loadPosts(currentTopicId);
+};
+
 // ==============================================================================
 // 9. EVENT LISTENERS
 // ==============================================================================

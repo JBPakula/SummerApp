@@ -611,18 +611,91 @@
         </div>
       </section>
 
-      <!-- 8. Zakładka: Forum -->
+<!-- 8. Zakładka: Forum -->
       <section id="tab-forum" class="app-tab" style="display: none;">
-        <div class="d-flex align-items-center justify-content-between mb-3">
-          <h4 class="fw-bold mb-0">💬 Forum Stada</h4>
-          <button class="btn btn-sm btn-outline-secondary" onclick="switchTab('dashboard')"><i class="bi bi-arrow-left"></i> Wróć</button>
+<!-- WIDOK 1: LISTA WĄTKÓW I TWORZENIE NOWEGO -->
+        <div id="forumTopicsView">
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <h4 class="fw-bold mb-0">💬 Forum</h4>
+            <button class="btn btn-sm btn-outline-secondary" onclick="switchTab('dashboard')"><i class="bi bi-arrow-left"></i> Wróć</button>
+          </div>
+
+          <!-- Formularz nowego wątku (domyślnie zwinięty) -->
+          <div class="card border-0 shadow-sm rounded-4 mb-3" style="border-left: 5px solid var(--burgund) !important; background: #FFFFFF;">
+            <div class="p-3 d-flex justify-content-between align-items-center" style="cursor: pointer;" onclick="toggleNewTopicForm()">
+              <h6 class="fw-bold mb-0" style="color: var(--burgund);">➕ Załóż nowy wątek</h6>
+              <i id="iconNewTopicToggle" class="bi bi-chevron-down text-muted"></i>
+            </div>
+            
+            <div id="newTopicFormCollapse" class="px-3 pb-3" style="display: none;">
+              <hr class="mt-0 mb-3 text-muted">
+              <label class="small fw-bold text-muted mb-1">Tytuł wątku:</label>
+              <input type="text" id="newTopicTitle" class="form-control form-control-sm mb-2" placeholder="Wpisz temat dyskusji...">
+
+              <label class="small fw-bold text-muted mb-1">Treść pierwszej wiadomości:</label>
+              <div class="d-flex align-items-center gap-1 mb-2 p-1 bg-light rounded border">
+                <button type="button" class="btn btn-sm btn-outline-dark fw-bold px-2 py-0" onclick="formatTopicDoc('bold')" title="Pogrubienie">B</button>
+                <button type="button" class="btn btn-sm btn-outline-dark fst-italic px-2 py-0" onclick="formatTopicDoc('italic')" title="Kursywa">I</button>
+                <button type="button" class="btn btn-sm btn-outline-dark text-decoration-underline px-2 py-0" onclick="formatTopicDoc('underline')" title="Podkreślenie">U</button>
+                <div class="vr mx-1"></div>
+                <label class="small fw-bold text-muted me-1" style="font-size: 11px;">Kolor:</label>
+                <input type="color" class="form-control form-control-color form-control-sm p-0 border-0" value="#4A1525" style="width: 26px; height: 26px; cursor: pointer;" onchange="formatTopicDoc('foreColor', this.value)" title="Wybierz kolor tekstu">
+              </div>
+
+              <div id="newTopicFirstPost" class="form-control mb-3 forum-editor-box" contenteditable="true" placeholder="Napisz pierwszy post otwierający dyskusję..."></div>
+              <button id="btnCreateTopic" class="btn btn-burgund btn-sm w-100 py-2">Opublikuj wątek</button>
+            </div>
+          </div>
+
+          <!-- Lista aktywnych wątków -->
+          <div class="card p-3 border-0 shadow-sm rounded-4 mb-3">
+            <h6 class="fw-bold mb-3" style="color: var(--burgund);">📑 Wątki dyskusyjne</h6>
+            <div id="forumTopicsList" class="list-group list-group-flush"></div>
+          </div>
+
+          <!-- Sekcja Wątków Archiwalnych -->
+          <div class="card p-3 border-0 shadow-sm rounded-4 mb-4">
+            <div class="d-flex justify-content-between align-items-center" style="cursor: pointer;" onclick="toggleArchivedTopics()">
+              <h6 class="fw-bold mb-0 text-muted" style="font-size: 0.9rem;">📦 Wątki archiwalne</h6>
+              <i id="iconArchivedToggle" class="bi bi-chevron-down text-muted"></i>
+            </div>
+            <div id="forumArchivedTopicsList" class="list-group list-group-flush mt-2" style="display: none;"></div>
+          </div>
         </div>
-        <div class="input-group input-group-sm mb-3">
-          <input type="text" id="forumInput" class="form-control" placeholder="Wiadomość...">
-          <button id="btnSendForum" class="btn btn-burgund">Wyślij</button>
+
+        <!-- WIDOK 2: WIDOK POJEDYNCZEGO WĄTKU -->
+        <div id="forumSingleTopicView" style="display: none;">
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <button class="btn btn-sm btn-outline-secondary" onclick="showTopicsList()"><i class="bi bi-arrow-left"></i> Wróć do wątków</button>
+            <h5 class="fw-bold mb-0 text-truncate px-2" id="activeTopicTitle" style="color: var(--burgund);">Wątek</h5>
+            <span></span>
+          </div>
+
+          <!-- Lista wszystkich wpisów w wątku -->
+          <div id="forumPostsList" class="mb-3"></div>
+
+          <!-- Formularz kolejnej odpowiedzi -->
+          <div class="card p-3 border-0 shadow-sm rounded-4 mb-4">
+            <h6 class="fw-bold mb-2" style="color: var(--burgund);">✍️ Napisz odpowiedź</h6>
+            
+            <!-- Pasek formatowania -->
+            <div class="d-flex align-items-center gap-1 mb-2 p-1 bg-light rounded border">
+              <button type="button" class="btn btn-sm btn-outline-dark fw-bold px-2 py-0" onclick="formatReplyDoc('bold')" title="Pogrubienie">B</button>
+              <button type="button" class="btn btn-sm btn-outline-dark fst-italic px-2 py-0" onclick="formatReplyDoc('italic')" title="Kursywa">I</button>
+              <button type="button" class="btn btn-sm btn-outline-dark text-decoration-underline px-2 py-0" onclick="formatReplyDoc('underline')" title="Podkreślenie">U</button>
+              <div class="vr mx-1"></div>
+              <label class="small fw-bold text-muted me-1" style="font-size: 11px;">Kolor:</label>
+              <input type="color" class="form-control form-control-color form-control-sm p-0 border-0" value="#4A1525" style="width: 26px; height: 26px; cursor: pointer;" onchange="formatReplyDoc('foreColor', this.value)" title="Wybierz kolor tekstu">
+            </div>
+
+            <div id="forumPostEditor" class="form-control mb-2 forum-editor-box" contenteditable="true" placeholder="Wpisz treść odpowiedzi..."></div>
+
+            <button id="btnSendPost" class="btn btn-burgund btn-sm w-100 py-2">Opublikuj odpowiedź</button>
+          </div>
         </div>
-        <div id="forumMessages"></div>
       </section>
+
+
     </main>
 
     <!-- Stopka -->
