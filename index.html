@@ -95,9 +95,11 @@
             </div>
           </div>
           <div class="col-6">
-            <div class="card dashboard-card shadow-sm h-100" onclick="switchTab('💬 Forum')">
+            <div class="card dashboard-card shadow-sm h-100 position-relative" onclick="switchTab('💬 Forum')">
               <div class="card-body text-center py-2 px-1">
-                <div class="fw-bold tile-title">Forum</div>
+                <div class="fw-bold tile-title">
+                  Forum <span id="dashboardForumBadge" class="badge bg-danger rounded-pill ms-1" style="display: none; font-size: 0.65rem;">Nowe</span>
+                </div>
                 <div class="tile-desc text-muted">Wątki i ustalenia</div>
               </div>
             </div>
@@ -216,16 +218,18 @@
         </div>
       </section>
 
-      <!-- ========================================================================== -->
+<!-- ========================================================================== -->
       <!-- 2. MODUŁ: FORUM DYSKUSYJNE -->
       <!-- ========================================================================== -->
       <section id="tab-forum" class="app-tab" style="display: none;">
+        <!-- Widok listy wątków -->
         <div id="forumTopicsView">
           <div class="d-flex align-items-center justify-content-between mb-3">
             <h4 class="fw-bold mb-0">💬 Forum</h4>
             <button class="btn btn-sm btn-outline-secondary" onclick="switchTab('dashboard')"><i class="bi bi-arrow-left"></i> Wróć</button>
           </div>
 
+          <!-- Zwijany formularz nowego wątku -->
           <div class="card border-0 shadow-sm rounded-4 mb-3" style="border-left: 5px solid var(--burgund) !important; background: #FFFFFF;">
             <div class="p-3 d-flex justify-content-between align-items-center" style="cursor: pointer;" onclick="toggleNewTopicForm()">
               <h6 class="fw-bold mb-0" style="color: var(--burgund);">➕ Załóż nowy wątek</h6>
@@ -252,11 +256,13 @@
             </div>
           </div>
 
+          <!-- Lista aktywnych wątków -->
           <div class="card p-3 border-0 shadow-sm rounded-4 mb-3">
             <h6 class="fw-bold mb-3" style="color: var(--burgund);">📑 Wątki dyskusyjne</h6>
             <div id="forumTopicsList" class="list-group list-group-flush"></div>
           </div>
 
+          <!-- Sekcja wątków archiwalnych -->
           <div class="card p-3 border-0 shadow-sm rounded-4 mb-4">
             <div class="d-flex justify-content-between align-items-center" style="cursor: pointer;" onclick="toggleArchivedTopics()">
               <h6 class="fw-bold mb-0 text-muted" style="font-size: 0.9rem;">📦 Wątki archiwalne</h6>
@@ -266,11 +272,17 @@
           </div>
         </div>
 
+        <!-- Widok pojedynczego wątku -->
         <div id="forumSingleTopicView" style="display: none;">
           <div class="d-flex align-items-center justify-content-between mb-3">
             <button class="btn btn-sm btn-outline-secondary" onclick="showTopicsList()"><i class="bi bi-arrow-left"></i> Wróć do wątków</button>
-            <h5 class="fw-bold mb-0 text-truncate px-2" id="activeTopicTitle" style="color: var(--burgund);">Wątek</h5>
-            <span></span>
+            <div class="d-flex align-items-center gap-2 overflow-hidden px-2">
+              <button id="btnToggleSubscription" class="btn btn-sm btn-light border p-1 rounded-circle flex-shrink-0" title="Przełącz powiadomienia">
+                <i id="iconTopicSub" class="bi bi-bell-slash text-muted fs-6"></i>
+              </button>
+              <h5 class="fw-bold mb-0 text-truncate" id="activeTopicTitle" style="color: var(--burgund);">Wątek</h5>
+            </div>
+            <div id="topicHeaderActions"></div>
           </div>
 
           <div id="forumPostsList" class="mb-3"></div>
