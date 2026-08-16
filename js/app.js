@@ -9,8 +9,8 @@ const SUPABASE_KEY = "sb_publishable_4lljAeNc5dvmsJG2u1-pgQ_zCnATIE1";
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const LICZBA_OSOB_W_EKIPIE = { "Całe Stado": 15, "Bobry": 3, "Pakuły": 4, "Robaki": 4, "Sileziny": 4 };
-const DOM_LAT = 47.8522;
-const DOM_LNG = 20.3297;
+const DOM_LAT = 47.868557;
+const DOM_LNG = 20.331627;
 
 let currentUser = null;
 let currentUserId = null;
@@ -295,6 +295,16 @@ function getCategoryPinIcon(category, number) {
   let pinClass = 'pin-inne';
   const cat = (category || '').toLowerCase();
   
+  if (cat.includes('dom')) {
+    return L.divIcon({
+      className: 'custom-pin-wrapper',
+      html: `<div class="custom-pin pin-dom" style="width: 32px; height: 32px; font-size: 15px;">🏠</div>`,
+      iconSize: [32, 32],
+      iconAnchor: [16, 16],
+      popupAnchor: [0, -16]
+    });
+  }
+  
   if (cat.includes('term')) pinClass = 'pin-termy';
   else if (cat.includes('zwiedzanie') || cat.includes('zabytek') || cat.includes('atrakcj')) pinClass = 'pin-zwiedzanie';
   else if (cat.includes('jedzenie') || cat.includes('wino') || cat.includes('restaurac')) pinClass = 'pin-jedzenie';
@@ -325,8 +335,8 @@ function initMap() {
     popupAnchor: [0, -16]
   });
 
-  domMarker = L.marker([DOM_LAT, DOM_LNG], { icon: homeIcon }).addTo(mapInstance)
-    .bindPopup('<b>🏠 Ámbitus ház (Dom)</b><br><small class="text-muted">Sáfrány út 38/a, Egerszalók</small>');
+  //domMarker = L.marker([DOM_LAT, DOM_LNG], { icon: homeIcon }).addTo(mapInstance)
+    //.bindPopup('<b>🏠 Ámbitus ház (Dom)</b><br><small class="text-muted">Sáfrány út 38/a, Egerszalók</small>');
 
   mapInstance.on('click', (e) => {
     selectedLatLng = e.latlng;
@@ -1883,13 +1893,12 @@ async function loadPastGames() {
 // 9. GLOBALNE LISTENERY ZDARZEŃ
 // ==============================================================================
 function setupEventListeners() {
-  const btnHome = document.getElementById("btnCenterHome");
+const btnHome = document.getElementById("btnCenterHome");
   if (btnHome) {
     btnHome.onclick = () => {
       if (mapInstance) {
         document.getElementById("mapContainer").scrollIntoView({ behavior: "smooth", block: "start" });
         mapInstance.setView([DOM_LAT, DOM_LNG], 16);
-        if (domMarker) domMarker.openPopup();
       }
     };
   }
