@@ -301,7 +301,7 @@ function switchTab(tabName) {
 }
 
 // ==============================================================================
-// 1. MODUŁ: MAPA (Z GPS, RADAREM I MODALEM DODAWANIA)
+// 1. MODUŁ: MAPA (KOMPAKTOWE 2 KOLUMNY, BIAŁY PRZYCISK, AUTO-KADROWANIE)
 // ==============================================================================
 function getCategoryPinIcon(category, number) {
   let pinClass = 'pin-inne';
@@ -310,10 +310,10 @@ function getCategoryPinIcon(category, number) {
   if (cat.includes('dom')) {
     return L.divIcon({
       className: 'custom-pin-wrapper',
-      html: `<div class="custom-pin pin-dom" style="width: 32px; height: 32px; font-size: 15px;">🏠</div>`,
-      iconSize: [32, 32],
-      iconAnchor: [16, 16],
-      popupAnchor: [0, -16]
+      html: `<div class="custom-pin pin-dom" style="width: 30px; height: 30px; font-size: 14px;">🏠</div>`,
+      iconSize: [30, 30],
+      iconAnchor: [15, 15],
+      popupAnchor: [0, -15]
     });
   }
   
@@ -323,11 +323,45 @@ function getCategoryPinIcon(category, number) {
 
   return L.divIcon({
     className: 'custom-pin-wrapper',
-    html: `<div class="custom-pin ${pinClass}" style="width: 28px; height: 28px;">#${number}</div>`,
-    iconSize: [28, 28],
-    iconAnchor: [14, 14],
-    popupAnchor: [0, -14]
+    html: `<div class="custom-pin ${pinClass}" style="width: 26px; height: 26px; font-size: 11px;">#${number}</div>`,
+    iconSize: [26, 26],
+    iconAnchor: [13, 13],
+    popupAnchor: [0, -13]
   });
+}
+
+function formatHoursCompact(hours) {
+  if (!hours) return '';
+  if (typeof hours === 'string') return hours;
+  if (typeof hours === 'object') {
+    const lines = [];
+    if (hours.summer) lines.push(`<b>Lato:</b> ${hours.summer}`);
+    if (hours.daily) lines.push(`<b>Dni:</b> ${hours.daily}`);
+    if (hours.winter) lines.push(`<b>Zima:</b> ${hours.winter}`);
+    if (hours.notes) lines.push(`<i>${hours.notes}</i>`);
+    if (lines.length === 0) {
+      return Object.entries(hours).map(([k, v]) => `<b>${k}:</b> ${v}`).join('<br>');
+    }
+    return lines.join('<br>');
+  }
+  return String(hours);
+}
+
+function formatPricesCompact(prices) {
+  if (!prices) return '';
+  if (typeof prices === 'string') return prices;
+  if (typeof prices === 'object') {
+    const cur = prices.currency || 'HUF';
+    const lines = [];
+    if (prices.adult_huf) lines.push(`<b>Dor.:</b> ${prices.adult_huf} ${cur}`);
+    if (prices.child_huf) lines.push(`<b>Dziecko:</b> ${prices.child_huf} ${cur}`);
+    if (prices.senior_huf) lines.push(`<b>Senior:</b> ${prices.senior_huf} ${cur}`);
+    if (lines.length === 0) {
+      return Object.entries(prices).filter(([k]) => k !== 'currency').map(([k, v]) => `<b>${k}:</b> ${v}`).join('<br>');
+    }
+    return lines.join('<br>');
+  }
+  return String(prices);
 }
 
 function initMap() {
@@ -336,7 +370,10 @@ function initMap() {
   const container = document.getElementById('mapContainer');
   if (!container) return;
 
-  mapInstance = L.map('mapContainer').setView([DOM_LAT, DOM_LNG], 13);
+  mapInstance = L.map('mapContainer', {
+    zoomControl: true,
+    maxZoom: 19
+  }).setView([DOM_LAT, DOM_LNG], 13);
   
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
@@ -346,14 +383,13 @@ function initMap() {
   mapMarkersGroup = L.layerGroup().addTo(mapInstance);
   radarMarkersGroup = L.layerGroup().addTo(mapInstance);
 
-  // Przycisk globusa pod kontrolkami zoomu (+ / -)
   const fitControl = L.Control.extend({
     options: { position: 'topleft' },
     onAdd: function() {
-      const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
-      const link = L.DomUtil.create('a', '', container);
+      const cont = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+      const link = L.DomUtil.create('a', '', cont);
       link.href = '#';
-      link.title = 'Pokaż wszystkie widoczne punkty';
+      link.title = 'Dopasuj widok do wszystkich punktów';
       link.innerHTML = '🌐';
       link.style.fontSize = '14px';
       link.style.display = 'flex';
@@ -366,12 +402,11 @@ function initMap() {
         e.stopPropagation();
         fitAllMarkers();
       };
-      return container;
+      return cont;
     }
   });
   mapInstance.addControl(new fitControl());
 
-  // Kliknięcie na mapie otwiera modal dodawania
   mapInstance.on('click', (e) => {
     const { lat, lng } = e.latlng;
     document.getElementById("newPointLat").value = lat;
@@ -390,7 +425,6 @@ function initMap() {
   setupMapButtons();
 }
 
-// Obsługa zapisu z modala
 const formAddMapPoint = document.getElementById("formAddMapPoint");
 if (formAddMapPoint) {
   formAddMapPoint.onsubmit = async (e) => {
@@ -430,7 +464,7 @@ function fitAllMarkers() {
   if (layers.length === 0) return;
 
   const group = L.featureGroup(layers);
-  mapInstance.fitBounds(group.getBounds().pad(0.15), { animate: true, duration: 1.0 });
+  mapInstance.fitBounds(group.getBounds().pad(0.12), { animate: true, duration: 0.8 });
 }
 
 async function loadMapData() {
@@ -445,7 +479,6 @@ async function loadMapData() {
   if (error || !points) return;
   mapPointsData = points;
 
-  // Domyślne filtrowanie na start: Termy + Dom
   const initialFiltered = mapPointsData.filter(p => {
     const cat = (p.category || '').toLowerCase();
     return cat.includes('term') || cat.includes('dom');
@@ -460,26 +493,64 @@ function renderMapMarkers(points) {
 
   points.forEach((p, idx) => {
     if (!p.lat || !p.lng) return;
+    const isDom = (p.category || '').toLowerCase().includes('dom');
     const icon = getCategoryPinIcon(p.category, idx + 1);
     const marker = L.marker([p.lat, p.lng], { icon: icon });
 
-    const photoHtml = p.photo ? `<img src="${p.photo}" style="width:100%; height:110px; object-fit:cover; border-radius:8px;" class="mb-2">` : '';
+    const photoHtml = p.photo ? `<img src="${p.photo}" style="width:100%; height:75px; object-fit:cover; border-radius:6px; margin-bottom: 4px;" class="shadow-sm">` : '';
     const gmapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}`;
-    const webUrl = p.official_url ? `<a href="${p.official_url}" target="_blank" class="btn btn-sm btn-outline-secondary py-0 mt-1" style="font-size:11px;">Strona WWW</a>` : '';
+    const webUrl = p.official_url ? `<a href="${p.official_url}" target="_blank" class="btn btn-sm btn-outline-secondary py-1 px-2 text-decoration-none" style="font-size:11px;"><i class="bi bi-globe"></i> WWW</a>` : '';
+    
+    const distHtml = isDom 
+      ? `<span class="badge bg-danger mb-1" style="font-size:10px;">🏠 Baza noclegowa</span>`
+      : (p.distance_from_egerszalok != null 
+          ? `<div class="fw-bold mb-1" style="font-size:11px; color:#1E293B;"><i class="bi bi-car-front-fill text-muted me-1"></i>${p.distance_from_egerszalok} km od Ámbitus ház</div>` 
+          : '');
+
+    const hoursText = formatHoursCompact(p.opening_hours);
+    const pricesText = formatPricesCompact(p.prices);
+
+    let detailsGrid = '';
+    if (hoursText || pricesText) {
+      detailsGrid = `
+        <div style="display: flex; gap: 4px; margin: 4px 0 6px 0; text-align: left; font-size: 10px; line-height: 1.3;">
+          ${hoursText ? `
+            <div style="flex: 1; padding: 4px; background: #F8FAFC; border-radius: 5px; border: 1px solid #E2E8F0;">
+              <div style="font-weight: 700; color: #64748B; font-size: 9px; margin-bottom: 2px;">🕒 GODZINY</div>
+              <div>${hoursText}</div>
+            </div>` : ''}
+          ${pricesText ? `
+            <div style="flex: 1; padding: 4px; background: #F8FAFC; border-radius: 5px; border: 1px solid #E2E8F0;">
+              <div style="font-weight: 700; color: #64748B; font-size: 9px; margin-bottom: 2px;">🎟️ CENNIK</div>
+              <div>${pricesText}</div>
+            </div>` : ''}
+        </div>
+      `;
+    }
 
     const popupContent = `
-      <div style="min-width: 180px; max-width: 230px; font-family: sans-serif;">
+      <div style="min-width: 235px; max-width: 275px; font-family: inherit; font-size: 11.5px;">
         ${photoHtml}
-        <b style="color:var(--burgund); font-size:13px;">${p.name}</b>
-        <div class="text-muted small my-1" style="font-size:11px;">${p.address || ''}</div>
-        <div class="d-flex justify-content-between align-items-center mt-2">
-          <a href="${gmapsUrl}" target="_blank" class="btn btn-sm btn-danger py-0 px-2" style="font-size:11px; background:var(--burgund);">🚗 Jedź</a>
+        <div class="fw-bold fs-6 mb-0 text-truncate" style="color:var(--burgund); line-height: 1.2;">${p.name}</div>
+        <div class="text-muted small mb-1 text-truncate" style="font-size:10px;">${p.address || ''}</div>
+        ${distHtml}
+        ${detailsGrid}
+        <div class="d-flex justify-content-between align-items-center mt-1 pt-1 border-top">
+          <a href="${gmapsUrl}" target="_blank" class="btn btn-sm btn-trasa-gmaps py-1 px-3 fw-bold" style="font-size:11px; background-color: var(--burgund) !important; color: #FFFFFF !important; border-radius: 6px;">
+            🚗 Trasa
+          </a>
           ${webUrl}
         </div>
       </div>
     `;
 
-    marker.bindPopup(popupContent);
+    marker.bindPopup(popupContent, {
+      maxWidth: 290,
+      minWidth: 240,
+      autoPan: true,
+      autoPanPaddingTopLeft: [10, 20],
+      autoPanPaddingBottomRight: [10, 10]
+    });
     mapMarkersGroup.addLayer(marker);
   });
 }
@@ -489,7 +560,7 @@ function renderMapList(points) {
   if (!listContainer) return;
 
   if (points.length === 0) {
-    listContainer.innerHTML = "<div class='text-muted small'>Brak miejsc do wyświetlenia.</div>";
+    listContainer.innerHTML = "<div class='text-muted small py-2'>Brak miejsc do wyświetlenia.</div>";
     return;
   }
 
@@ -497,15 +568,24 @@ function renderMapList(points) {
     const isDom = (p.category || '').toLowerCase().includes('dom');
     const badgeNumber = isDom ? '🏠' : `#${idx + 1}`;
     
+    // Spis: wyłącznie odległość i adres (bez kategorii)
+    const distText = isDom ? 'Baza noclegowa' : (p.distance_from_egerszalok != null ? `${p.distance_from_egerszalok} km od domu` : '');
+    const addressText = p.address ? p.address : '';
+    const subtitle = [distText, addressText].filter(Boolean).join(' &bull; ');
+
     return `
       <div class="list-group-item list-group-item-action d-flex justify-content-between align-items-center px-2 py-2" 
            style="cursor: pointer;" onclick="focusMapPoint(${p.lat}, ${p.lng})">
-        <div>
-          <span class="badge ${isDom ? 'bg-danger' : 'bg-light text-dark border'} me-1">${badgeNumber}</span>
-          <b style="font-size: 0.9rem; color: var(--burgund);">${p.name}</b>
-          <div class="text-muted small ps-4" style="font-size: 11px;">${p.category || 'Inne'} &bull; ${p.address || 'Egerszalók'}</div>
+        <div class="pe-2 overflow-hidden">
+          <div class="d-flex align-items-center gap-1">
+            <span class="badge ${isDom ? 'bg-danger' : 'bg-light text-dark border'} flex-shrink-0">${badgeNumber}</span>
+            <b class="text-truncate" style="font-size: 0.92rem; color: var(--burgund);">${p.name}</b>
+          </div>
+          <div class="text-muted text-truncate ps-4 mt-1" style="font-size: 11px;">
+            ${subtitle}
+          </div>
         </div>
-        <i class="bi bi-chevron-right text-muted"></i>
+        <i class="bi bi-chevron-right text-muted flex-shrink-0"></i>
       </div>
     `;
   }).join("");
@@ -514,7 +594,20 @@ function renderMapList(points) {
 window.focusMapPoint = function(lat, lng) {
   if (!mapInstance) return;
   document.getElementById("mapContainer").scrollIntoView({ behavior: "smooth", block: "start" });
-  mapInstance.flyTo([lat, lng], 16, { duration: 1.2 });
+  
+  // Przesunięcie środka o 0.005 stopnia na północ od dolnej krawędzi, by dymek idealnie wszedł w kadr
+  const offsetLat = lat + 0.0045;
+  mapInstance.flyTo([offsetLat, lng], 15, { duration: 0.8 });
+
+  setTimeout(() => {
+    if (mapMarkersGroup) {
+      mapMarkersGroup.eachLayer(layer => {
+        if (layer.getLatLng && Math.abs(layer.getLatLng().lat - lat) < 0.0001 && Math.abs(layer.getLatLng().lng - lng) < 0.0001) {
+          layer.openPopup();
+        }
+      });
+    }
+  }, 850);
 };
 
 function setupMapButtons() {
@@ -612,6 +705,7 @@ function setupMapButtons() {
         renderMapMarkers(filtered);
         renderMapList(filtered);
       }
+      fitAllMarkers();
     };
   });
 
@@ -680,9 +774,9 @@ async function sendAndFetchRadarLocations() {
 
             const marker = L.marker([loc.lat, loc.lng], { icon: carIcon });
             marker.bindPopup(`
-              <div class="text-center p-1">
+              <div class="text-center p-1" style="font-size:12px;">
                 <b style="color:var(--burgund);">${loc.login}</b> (${loc.team})<br>
-                <span class="text-muted small" style="font-size:11px;">Aktualizacja: ${timeText}</span>
+                <span class="text-muted small" style="font-size:10.5px;">Aktualizacja: ${timeText}</span>
               </div>
             `);
             radarMarkersGroup.addLayer(marker);
@@ -694,7 +788,6 @@ async function sendAndFetchRadarLocations() {
     { enableHighAccuracy: true, timeout: 8000 }
   );
 }
-
 // ==============================================================================
 // 2. MODUŁ: FORUM DYSKUSYJNE (POPRAWIONE FORMATOWANIE, WZMIANKI, LAJKI I POWIADOMIENIA)
 // ==============================================================================
