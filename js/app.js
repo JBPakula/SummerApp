@@ -16,7 +16,7 @@ let currentUser = null;
 let currentUserId = null;
 let currentTeam = "Pakuły";
 let currentMode = "Na wyjeździe";
-let mapInstance = null;
+
 let bazaKursow = {
   "PLN_HUF": 85.20, "HUF_PLN": 0.0117,
   "PLN_EUR": 0.23,  "EUR_PLN": 4.32,
@@ -25,6 +25,22 @@ let bazaKursow = {
 };
 let malzenstwaMapa = {};
 let ekipyMapa = {};
+
+// Zmienne modułu Mapy
+let mapInstance = null;
+let mapMarkersGroup = null;
+let radarMarkersGroup = null;
+let myGpsMarker = null;
+let radarIntervalId = null;
+let isRadarActive = false;
+let mapPointsData = [];
+
+// Zmienne modułu Forum
+let currentTopicId = null;
+let currentTopicIsArchived = false;
+let forumUsersMap = {};
+let forumUserLogins = [];
+let forumRealtimeChannel = null;
 
 // ==============================================================================
 // 0.1 INICJALIZACJA I OBSŁUGA SESJI
@@ -141,7 +157,6 @@ async function verifyAndLogin(userName, password) {
     const welcomeEl = document.getElementById("welcomeUserName");
     if (welcomeEl) welcomeEl.innerText = currentUser;
 
-    // Ładowanie awatara na pulpicie
     const dashAvatarEl = document.getElementById("dashboardUserAvatar");
     const extensions = ["jpg", "jpeg", "png"];
     let extIndex = 0;
@@ -225,7 +240,6 @@ function renderDashboardDate() {
   const dateFormatted = `${day} ${months[now.getMonth()]}`;
   const weekdayFormatted = weekdays[now.getDay()];
 
-  // Data wyjazdu: 19 sierpnia 2026
   const targetDate = new Date(2026, 7, 19);
   const todayOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const diffDays = Math.ceil((targetDate - todayOnly) / (1000 * 60 * 60 * 24));
@@ -242,6 +256,8 @@ function renderDashboardDate() {
     <div class="text-muted small">${weekdayFormatted}</div>
     ${countdownHtml}
   `;
+
+  checkForumUnreadNotifications();
 }
 
 function switchTab(tabName) {
@@ -255,6 +271,7 @@ function switchTab(tabName) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   } else if (tabName.includes("Mapa")) {
     document.getElementById("tab-map").style.display = "block";
+    loadMapData();
     if (mapInstance) setTimeout(() => mapInstance.invalidateSize(), 200);
   } else if (tabName.includes("Forum")) {
     document.getElementById("tab-forum").style.display = "block";
@@ -284,16 +301,8 @@ function switchTab(tabName) {
 }
 
 // ==============================================================================
-// 1. MODUŁ: MAPA
+// 1. MODUŁ: MAPA (Z GPS, RADAREM I MODALEM DODAWANIA)
 // ==============================================================================
-let domMarker = null;
-let tempMarker = null;
-let selectedLatLng = null;
-let allMapPlaces = [];
-let activeCategoryFilter = "termy";
-let currentSearchPhrase = "";
-const markersMap = {};
-
 function getCategoryPinIcon(category, number) {
   let pinClass = 'pin-inne';
   const cat = (category || '').toLowerCase();
@@ -323,252 +332,369 @@ function getCategoryPinIcon(category, number) {
 
 function initMap() {
   if (mapInstance) return;
-  
-  mapInstance = L.map('mapContainer').setView([DOM_LAT, DOM_LNG], 13);
 
+  const container = document.getElementById('mapContainer');
+  if (!container) return;
+
+  mapInstance = L.map('mapContainer').setView([DOM_LAT, DOM_LNG], 13);
+  
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
     attribution: '© OpenStreetMap'
   }).addTo(mapInstance);
 
-  const homeIcon = L.divIcon({
-    className: 'custom-pin-wrapper',
-    html: `<div class="custom-pin pin-dom" style="width: 32px; height: 32px; font-size: 15px;">🏠</div>`,
-    iconSize: [32, 32],
-    iconAnchor: [16, 16],
-    popupAnchor: [0, -16]
+  mapMarkersGroup = L.layerGroup().addTo(mapInstance);
+  radarMarkersGroup = L.layerGroup().addTo(mapInstance);
+
+  // Przycisk globusa pod kontrolkami zoomu (+ / -)
+  const fitControl = L.Control.extend({
+    options: { position: 'topleft' },
+    onAdd: function() {
+      const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+      const link = L.DomUtil.create('a', '', container);
+      link.href = '#';
+      link.title = 'Pokaż wszystkie widoczne punkty';
+      link.innerHTML = '🌐';
+      link.style.fontSize = '14px';
+      link.style.display = 'flex';
+      link.style.alignItems = 'center';
+      link.style.justifyContent = 'center';
+      link.style.cursor = 'pointer';
+
+      link.onclick = function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        fitAllMarkers();
+      };
+      return container;
+    }
   });
+  mapInstance.addControl(new fitControl());
 
-  //domMarker = L.marker([DOM_LAT, DOM_LNG], { icon: homeIcon }).addTo(mapInstance)
-    //.bindPopup('<b>🏠 Ámbitus ház (Dom)</b><br><small class="text-muted">Sáfrány út 38/a, Egerszalók</small>');
-
+  // Kliknięcie na mapie otwiera czysty modal dodawania z wyborem kategorii
   mapInstance.on('click', (e) => {
-    selectedLatLng = e.latlng;
-    if (tempMarker) mapInstance.removeLayer(tempMarker);
+    const { lat, lng } = e.latlng;
+    document.getElementById("newPointLat").value = lat;
+    document.getElementById("newPointLng").value = lng;
+    document.getElementById("newPointName").value = "";
+    document.getElementById("newPointAddress").value = "";
+    document.getElementById("newPointCategory").value = "Zwiedzanie";
 
-    const tempIcon = L.divIcon({
-      className: 'custom-pin-wrapper',
-      html: `<div class="custom-pin" style="background-color: #f59e0b; width: 30px; height: 30px; font-size: 14px;">📍</div>`,
-      iconSize: [30, 30],
-      iconAnchor: [15, 15],
-      popupAnchor: [0, -15]
-    });
-
-    tempMarker = L.marker(selectedLatLng, { icon: tempIcon }).addTo(mapInstance);
-    tempMarker.bindPopup(`
-      <div class="text-center p-1" style="min-width: 140px;">
-        <div class="fw-bold mb-2" style="font-size: 12px;">Wybrany punkt</div>
-        <button id="btnPopupConfirm" class="btn btn-burgund btn-sm w-100 py-1 mb-1" style="font-size: 11px;">➕ Dodaj ten punkt</button>
-        <button id="btnPopupCancel" class="btn btn-outline-secondary btn-sm w-100 py-1" style="font-size: 11px;">❌ Anuluj</button>
-      </div>
-    `).openPopup();
-
-    setTimeout(() => {
-      const btnConfirm = document.getElementById("btnPopupConfirm");
-      const btnCancel = document.getElementById("btnPopupCancel");
-      if (btnConfirm) {
-        btnConfirm.onclick = () => {
-          tempMarker.closePopup();
-          const card = document.getElementById("addPlaceCard");
-          card.style.display = "block";
-          card.scrollIntoView({ behavior: "smooth", block: "center" });
-          document.getElementById("newPlaceName").focus();
-        };
-      }
-      if (btnCancel) btnCancel.onclick = usunTymczasowyPunkt;
-    }, 100);
-  });
-
-  setupAddPlaceForm();
-  setupFilterAndSearch();
-  loadMapPlaces();
-}
-
-function usunTymczasowyPunkt() {
-  if (tempMarker) {
-    mapInstance.removeLayer(tempMarker);
-    tempMarker = null;
-  }
-  selectedLatLng = null;
-  document.getElementById("addPlaceCard").style.display = "none";
-  document.getElementById("formAddPlace").reset();
-}
-
-function setupAddPlaceForm() {
-  const btnCancel = document.getElementById("btnCancelAddPlace");
-  if (btnCancel) btnCancel.onclick = usunTymczasowyPunkt;
-
-  const form = document.getElementById("formAddPlace");
-  if (form) {
-    form.onsubmit = async (e) => {
-      e.preventDefault();
-      const name = document.getElementById("newPlaceName").value.trim();
-      const category = document.getElementById("newPlaceCategory").value || "Inne";
-      if (!name || !selectedLatLng) return;
-
-      const { error } = await supabaseClient.from("map").insert({
-        name: name,
-        category: category,
-        lat: selectedLatLng.lat,
-        lng: selectedLatLng.lng,
-        created_by: currentUserId
-      });
-
-      if (error) {
-        alert("Błąd zapisu: " + error.message);
-        return;
-      }
-
-      usunTymczasowyPunkt();
-      loadMapPlaces();
-    };
-  }
-}
-
-function setupFilterAndSearch() {
-  const searchInput = document.getElementById("placeSearchInput");
-  if (searchInput) {
-    searchInput.oninput = (e) => {
-      currentSearchPhrase = e.target.value.toLowerCase().trim();
-      renderPlacesList();
-    };
-  }
-
-  const pills = document.querySelectorAll(".filter-pill");
-  pills.forEach(pill => {
-    pill.onclick = () => {
-      pills.forEach(p => p.className = "btn btn-sm btn-outline-secondary rounded-pill px-3 filter-pill");
-      pill.className = "btn btn-sm btn-burgund rounded-pill px-3 filter-pill active";
-      activeCategoryFilter = pill.getAttribute("data-cat");
-      renderPlacesList();
-    };
-  });
-}
-
-async function loadMapPlaces() {
-  const { data } = await supabaseClient.from("map").select("*").order("id", { ascending: true });
-  if (!data) return;
-
-  allMapPlaces = data;
-  Object.values(markersMap).forEach(m => mapInstance.removeLayer(m));
-
-  allMapPlaces.forEach((p, index) => {
-    if (p.lat && p.lng) {
-      const pinNumber = index + 1;
-      const icon = getCategoryPinIcon(p.category, pinNumber);
-      const marker = L.marker([p.lat, p.lng], { icon: icon }).addTo(mapInstance);
-
-      const popupHtml = `
-        <div style="min-width: 170px; max-width: 220px;">
-          ${p.photo ? `<img src="${p.photo}" class="map-popup-img" alt="Foto">` : ''}
-          <div class="fw-bold" style="color: var(--burgund);">#${pinNumber} ${p.name}</div>
-          ${p.distance_from_egerszalok ? `<div class="small text-muted">🚗 ${p.distance_from_egerszalok} km z domu</div>` : ''}
-          <button class="btn btn-outline-danger btn-sm w-100 py-1 mt-2" style="font-size: 11px;" onclick="window.pokazSzczegolyMiejsca(${p.id})">
-            📄 Pokaż szczegóły
-          </button>
-        </div>
-      `;
-
-      marker.bindPopup(popupHtml);
-      markersMap[p.id] = marker;
+    const modalEl = document.getElementById("modalAddMapPoint");
+    if (modalEl) {
+      const modal = new bootstrap.Modal(modalEl);
+      modal.show();
     }
   });
 
-  renderPlacesList();
+  setupMapButtons();
 }
 
-function renderPlacesList() {
-  const list = document.getElementById("placesList");
-  if (!list) return;
-  list.innerHTML = "";
+// Obsługa zapisu z modala
+const formAddMapPoint = document.getElementById("formAddMapPoint");
+if (formAddMapPoint) {
+  formAddMapPoint.onsubmit = async (e) => {
+    e.preventDefault();
+    const lat = parseFloat(document.getElementById("newPointLat").value);
+    const lng = parseFloat(document.getElementById("newPointLng").value);
+    const name = document.getElementById("newPointName").value.trim();
+    const category = document.getElementById("newPointCategory").value;
+    const address = document.getElementById("newPointAddress").value.trim();
 
-  const filtered = allMapPlaces.filter((p) => {
-    const matchesSearch = !currentSearchPhrase || (p.name && p.name.toLowerCase().includes(currentSearchPhrase)) || (p.address && p.address.toLowerCase().includes(currentSearchPhrase));
-    let matchesCategory = true;
+    if (!name || isNaN(lat) || isNaN(lng)) return;
+
+    const { error } = await supabaseClient.from("map").insert({
+      name: name,
+      category: category,
+      address: address,
+      lat: lat,
+      lng: lng,
+      created_by: currentUserId
+    });
+
+    const modalEl = document.getElementById("modalAddMapPoint");
+    const modal = bootstrap.Modal.getInstance(modalEl);
+    if (modal) modal.hide();
+
+    if (!error) {
+      await loadMapData();
+    } else {
+      alert("Błąd zapisu punktu: " + error.message);
+    }
+  };
+}
+
+function fitAllMarkers() {
+  if (!mapInstance || !mapMarkersGroup) return;
+  const layers = mapMarkersGroup.getLayers();
+  if (layers.length === 0) return;
+
+  const group = L.featureGroup(layers);
+  mapInstance.fitBounds(group.getBounds().pad(0.15), { animate: true, duration: 1.0 });
+}
+
+async function loadMapData() {
+  initMap();
+  if (mapMarkersGroup) mapMarkersGroup.clearLayers();
+
+  const { data: points, error } = await supabaseClient
+    .from("map")
+    .select("*")
+    .order("id", { ascending: true });
+
+  if (error || !points) return;
+  mapPointsData = points;
+
+  // Domyślne filtrowanie na start: tylko Termy
+ const initialFiltered = mapPointsData.filter(p => {
     const cat = (p.category || '').toLowerCase();
-    if (activeCategoryFilter === 'termy') matchesCategory = cat.includes('term');
-    else if (activeCategoryFilter === 'zwiedzanie') matchesCategory = cat.includes('zwiedzanie') || cat.includes('zabytek') || cat.includes('atrakcj');
-    else if (activeCategoryFilter === 'jedzenie') matchesCategory = cat.includes('jedzenie') || cat.includes('wino') || cat.includes('restaurac');
-    else if (activeCategoryFilter === 'inne') matchesCategory = !cat.includes('term') && !cat.includes('zwiedzanie') && !cat.includes('zabytek') && !cat.includes('jedzenie') && !cat.includes('wino');
-
-    return matchesSearch && matchesCategory;
+    return cat.includes('term') || cat.includes('dom');
   });
+  renderMapMarkers(initialFiltered);
+  renderMapList(initialFiltered);
+}
 
-  if (filtered.length === 0) {
-    list.innerHTML = `<div class="p-3 text-center text-muted small">Brak miejsc spełniających kryteria.</div>`;
+function renderMapMarkers(points) {
+  if (!mapMarkersGroup) return;
+  mapMarkersGroup.clearLayers();
+
+  points.forEach((p, idx) => {
+    if (!p.lat || !p.lng) return;
+    const icon = getCategoryPinIcon(p.category, idx + 1);
+    const marker = L.marker([p.lat, p.lng], { icon: icon });
+
+    const photoHtml = p.photo ? `<img src="${p.photo}" style="width:100%; height:110px; object-fit:cover; border-radius:8px;" class="mb-2">` : '';
+    const gmapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}`;
+    const webUrl = p.official_url ? `<a href="${p.official_url}" target="_blank" class="btn btn-sm btn-outline-secondary py-0 mt-1" style="font-size:11px;">Strona WWW</a>` : '';
+
+    const popupContent = `
+      <div style="min-width: 180px; max-width: 230px; font-family: sans-serif;">
+        ${photoHtml}
+        <b style="color:var(--burgund); font-size:13px;">${p.name}</b>
+        <div class="text-muted small my-1" style="font-size:11px;">${p.address || ''}</div>
+        <div class="d-flex justify-content-between align-items-center mt-2">
+          <a href="${gmapsUrl}" target="_blank" class="btn btn-sm btn-danger py-0 px-2" style="font-size:11px; background:var(--burgund);">🚗 Jedź</a>
+          ${webUrl}
+        </div>
+      </div>
+    `;
+
+    marker.bindPopup(popupContent);
+    mapMarkersGroup.addLayer(marker);
+  });
+}
+
+function renderMapList(points) {
+  const listContainer = document.getElementById("mapPlacesList");
+  if (!listContainer) return;
+
+  if (points.length === 0) {
+    listContainer.innerHTML = "<div class='text-muted small'>Brak miejsc do wyświetlenia.</div>";
     return;
   }
 
-  filtered.forEach((p) => {
-    const pinNumber = allMapPlaces.indexOf(p) + 1;
-    const item = document.createElement("button");
-    item.className = "list-group-item list-group-item-action d-flex justify-content-between align-items-center py-2";
-    item.innerHTML = `
-      <div class="text-start pe-2">
-        <div><b>#${pinNumber}</b> ${p.name}</div>
-        <div class="small text-muted">${p.distance_from_egerszalok ? `🚗 ${p.distance_from_egerszalok} km • ` : ''}${p.address || ''}</div>
+  listContainer.innerHTML = points.map((p, idx) => {
+    const isDom = (p.category || '').toLowerCase().includes('dom');
+    const badgeNumber = isDom ? '🏠' : `#${idx + 1}`;
+    
+    return `
+      <div class="list-group-item list-group-item-action d-flex justify-content-between align-items-center px-2 py-2" 
+           style="cursor: pointer;" onclick="focusMapPoint(${p.lat}, ${p.lng})">
+        <div>
+          <span class="badge ${isDom ? 'bg-danger' : 'bg-light text-dark border'} me-1">${badgeNumber}</span>
+          <b style="font-size: 0.9rem; color: var(--burgund);">${p.name}</b>
+          <div class="text-muted small ps-4" style="font-size: 11px;">${p.category || 'Inne'} &bull; ${p.address || 'Egerszalók'}</div>
+        </div>
+        <i class="bi bi-chevron-right text-muted"></i>
       </div>
-      <span class="badge ${p.category && p.category.toLowerCase().includes('term') ? 'bg-primary' : 'bg-secondary'}">${p.category || 'Atrakcja'}</span>
     `;
-
-    item.onclick = () => {
-      document.getElementById("mapContainer").scrollIntoView({ behavior: "smooth", block: "start" });
-      mapInstance.setView([p.lat, p.lng], 16);
-      if (markersMap[p.id]) markersMap[p.id].openPopup();
-    };
-
-    list.appendChild(item);
-  });
+  }).join("");
 }
 
-window.pokazSzczegolyMiejsca = function(placeId) {
-  const p = allMapPlaces.find(x => x.id === placeId);
-  if (!p) return;
-
-  document.getElementById("sheetPlaceTitle").innerText = p.name;
-  const body = document.getElementById("sheetPlaceBody");
-
-  let godzinyTekst = "";
-  if (p.opening_hours) {
-    godzinyTekst = typeof p.opening_hours === 'object' 
-      ? Object.entries(p.opening_hours).map(([k, v]) => `<b>${k}:</b> ${v}`).join('<br>')
-      : p.opening_hours;
-  }
-
-  let cenyTekst = "";
-  if (p.prices) {
-    cenyTekst = typeof p.prices === 'object' 
-      ? Object.entries(p.prices).map(([k, v]) => `<b>${k}:</b> ${v}`).join('<br>')
-      : p.prices;
-  }
-
-  body.innerHTML = `
-    ${p.photo ? `<img src="${p.photo}" class="sheet-header-img" alt="${p.name}">` : ''}
-    <div class="mb-3">
-      <span class="badge ${p.category && p.category.toLowerCase().includes('term') ? 'bg-primary' : 'bg-secondary'} mb-1">${p.category || 'Atrakcja'}</span>
-      ${p.address ? `<div class="small text-muted">📍 ${p.address}</div>` : ''}
-      ${p.distance_from_egerszalok ? `<div class="small fw-bold text-dark mt-1">🚗 Odległość z domu: ${p.distance_from_egerszalok} km</div>` : ''}
-    </div>
-    ${godzinyTekst ? `<div class="sheet-attr-box"><div class="fw-bold text-dark mb-1">🕒 Godziny otwarcia:</div><div>${godzinyTekst}</div></div>` : ''}
-    ${cenyTekst ? `<div class="sheet-attr-box"><div class="fw-bold text-dark mb-1">🎟️ Ceny biletów:</div><div>${cenyTekst}</div></div>` : ''}
-    <div class="d-grid gap-2 mt-3">
-      ${p.official_url ? `<a href="${p.official_url}" target="_blank" class="btn btn-outline-danger btn-sm">🌐 Strona oficjalna</a>` : ''}
-      ${p.lat && p.lng ? `<a href="https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}" target="_blank" class="btn btn-burgund btn-sm">🧭 Nawiguj (Google Maps)</a>` : ''}
-    </div>
-  `;
-
-  const sheetEl = document.getElementById("placeDetailsSheet");
-  const bsSheet = new bootstrap.Offcanvas(sheetEl);
-  bsSheet.show();
+window.focusMapPoint = function(lat, lng) {
+  if (!mapInstance) return;
+  document.getElementById("mapContainer").scrollIntoView({ behavior: "smooth", block: "start" });
+  mapInstance.flyTo([lat, lng], 16, { duration: 1.2 });
 };
+
+function setupMapButtons() {
+  const btnHome = document.getElementById("btnCenterHome");
+  if (btnHome) {
+    btnHome.onclick = () => {
+      if (mapInstance) {
+        document.getElementById("mapContainer").scrollIntoView({ behavior: "smooth", block: "start" });
+        mapInstance.flyTo([DOM_LAT, DOM_LNG], 15);
+      }
+    };
+  }
+
+  const btnGps = document.getElementById("btnMyLocation");
+  if (btnGps) {
+    btnGps.onclick = () => {
+      if (!navigator.geolocation) {
+        alert("Twoje urządzenie lub przeglądarka nie obsługuje geolokalizacji.");
+        return;
+      }
+
+      btnGps.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Szukam...`;
+
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          btnGps.innerHTML = `<i class="bi bi-crosshair me-1"></i> Moja lokalizacja`;
+          const { latitude, longitude } = pos.coords;
+
+          if (myGpsMarker && mapInstance) mapInstance.removeLayer(myGpsMarker);
+
+          const gpsIcon = L.divIcon({
+            className: 'custom-pin-wrapper',
+            html: `<div class="user-gps-pulse" title="Tu jesteś"></div>`,
+            iconSize: [18, 18],
+            iconAnchor: [9, 9]
+          });
+
+          if (mapInstance) {
+            myGpsMarker = L.marker([latitude, longitude], { icon: gpsIcon }).addTo(mapInstance);
+            myGpsMarker.bindPopup("<b>📍 Twoja obecna pozycja</b>").openPopup();
+
+            document.getElementById("mapContainer").scrollIntoView({ behavior: "smooth", block: "start" });
+            mapInstance.flyTo([latitude, longitude], 16, { duration: 1.2 });
+          }
+        },
+        (err) => {
+          btnGps.innerHTML = `<i class="bi bi-crosshair me-1"></i> Moja lokalizacja`;
+          alert("Nie udało się pobrać pozycji GPS: " + err.message);
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    };
+  }
+
+  const btnRadar = document.getElementById("btnToggleRadar");
+  if (btnRadar) {
+    btnRadar.onclick = () => {
+      isRadarActive = !isRadarActive;
+      const dot = document.getElementById("radarStatusDot");
+      const text = document.getElementById("radarStatusText");
+
+      if (isRadarActive) {
+        btnRadar.classList.add("radar-active");
+        if (dot) dot.className = "rounded-circle bg-success";
+        if (text) text.innerHTML = `Radar Stada: <b>Nadawanie aktywne (co 30s)</b>`;
+        sendAndFetchRadarLocations();
+        radarIntervalId = setInterval(sendAndFetchRadarLocations, 30000);
+      } else {
+        btnRadar.classList.remove("radar-active");
+        if (dot) dot.className = "rounded-circle bg-secondary";
+        if (text) text.innerHTML = `Radar Stada w trasie: <b>Wyłączony</b>`;
+        if (radarIntervalId) clearInterval(radarIntervalId);
+        if (radarMarkersGroup) radarMarkersGroup.clearLayers();
+      }
+    };
+  }
+
+  const filterBadges = document.querySelectorAll("#mapFilterBadges button");
+  filterBadges.forEach(btn => {
+    btn.onclick = () => {
+      filterBadges.forEach(b => {
+        b.className = "btn btn-sm btn-outline-secondary px-2 py-1";
+      });
+      btn.className = "btn btn-sm btn-burgund px-2 py-1 active-filter";
+
+      const cat = btn.getAttribute("data-cat");
+      if (cat === "all") {
+        renderMapMarkers(mapPointsData);
+        renderMapList(mapPointsData);
+      } else {
+        // Zawsze dołączaj Dom do wybranej kategorii
+        const filtered = mapPointsData.filter(p => {
+          const itemCat = (p.category || '').toLowerCase();
+          return itemCat.includes(cat.toLowerCase()) || itemCat.includes('dom');
+        });
+        renderMapMarkers(filtered);
+        renderMapList(filtered);
+      }
+    };
+  });
+
+  const searchInput = document.getElementById("mapSearchInput");
+  if (searchInput) {
+    searchInput.oninput = (e) => {
+      const q = e.target.value.toLowerCase().trim();
+      const filtered = mapPointsData.filter(p => 
+        (p.name && p.name.toLowerCase().includes(q)) || 
+        (p.address && p.address.toLowerCase().includes(q)) || 
+        (p.category && p.category.toLowerCase().includes(q))
+      );
+      renderMapMarkers(filtered);
+      renderMapList(filtered);
+    };
+  }
+}
+
+async function sendAndFetchRadarLocations() {
+  if (!navigator.geolocation || !currentUserId) return;
+
+  navigator.geolocation.getCurrentPosition(
+    async (pos) => {
+      const { latitude, longitude } = pos.coords;
+
+      await supabaseClient.from("user_locations").upsert({
+        user_id: currentUserId,
+        login: currentUser || "Anonim",
+        team: currentTeam || "Stado",
+        lat: latitude,
+        lng: longitude,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'user_id' });
+
+      const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+      const { data: locations } = await supabaseClient
+        .from("user_locations")
+        .select("*")
+        .neq("user_id", currentUserId)
+        .gte("updated_at", twoHoursAgo);
+
+      if (radarMarkersGroup) {
+        radarMarkersGroup.clearLayers();
+
+        if (locations) {
+          locations.forEach(loc => {
+            const diffMin = Math.round((Date.now() - new Date(loc.updated_at).getTime()) / 60000);
+            const timeText = diffMin <= 1 ? "przed chwilą" : `${diffMin} min temu`;
+            const cleanLogin = loc.login.trim();
+            const avatarUrl = `assets/avatars/${cleanLogin}.jpg`;
+
+            const carIcon = L.divIcon({
+              className: 'custom-pin-wrapper',
+              html: `
+                <div class="radar-car-pin" style="width: 32px; height: 32px;" title="${loc.login} (${loc.team})">
+                  <img src="${avatarUrl}" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(cleanLogin)}&background=4A1525&color=fff&size=64'">
+                </div>
+              `,
+              iconSize: [32, 32],
+              iconAnchor: [16, 16]
+            });
+
+            const marker = L.marker([loc.lat, loc.lng], { icon: carIcon });
+            marker.bindPopup(`
+              <div class="text-center p-1">
+                <b style="color:var(--burgund);">${loc.login}</b> (${loc.team})<br>
+                <span class="text-muted small" style="font-size:11px;">Aktualizacja: ${timeText}</span>
+              </div>
+            `);
+            radarMarkersGroup.addLayer(marker);
+          });
+        }
+      }
+    },
+    (err) => console.warn("Błąd GPS radaru:", err.message),
+    { enableHighAccuracy: true, timeout: 8000 }
+  );
+}
 
 // ==============================================================================
 // 2. MODUŁ: FORUM DYSKUSYJNE
 // ==============================================================================
-let currentTopicId = null;
-let currentTopicIsArchived = false;
-let forumUsersMap = {}; // id -> login
-let forumUserLogins = []; // lista loginów
-
 function renderAvatarHtml(login) {
   if (!login) return `<span class="forum-avatar-placeholder me-2">👤</span>`;
   const cleanLogin = login.trim();
@@ -607,7 +733,6 @@ async function pobierzUzytkownikowForum() {
   }
 }
 
-// Podświetlanie wzmianek w tekście bez tworzenia wielokrotnych tagów
 function parseMentionsInHtml(htmlText) {
   if (!htmlText) return "";
   let cleanText = htmlText.replace(/<span class="forum-mention-badge"[^>]*>(@\w+)<\/span>/gi, "$1");
@@ -618,7 +743,6 @@ function parseMentionsInHtml(htmlText) {
   return cleanText;
 }
 
-// Obsługa @Wzmianek w edytorze
 function attachMentionHighlighter(editorId) {
   const editor = document.getElementById(editorId);
   if (!editor) return;
@@ -630,7 +754,6 @@ function attachMentionHighlighter(editorId) {
   });
 }
 
-// Auto-subskrypcja dla oznaczonych osób (z wyzerowanym licznikiem przeczytania)
 async function subscribeMentionedUsers(rawHtml, topicId) {
   const mentionedLogins = [];
   forumUserLogins.forEach(uLogin => {
@@ -650,13 +773,12 @@ async function subscribeMentionedUsers(rawHtml, topicId) {
         topic_id: topicId,
         user_id: uId,
         is_subscribed: true,
-        last_read_at: "1970-01-01T00:00:00.000Z" // Gwarancja pojawienia się powiadomienia "Nowe"
+        last_read_at: "1970-01-01T00:00:00.000Z"
       }, { onConflict: 'topic_id, user_id' });
     }
   }
 }
 
-// Sprawdzanie i wyświetlanie powiadomień na kafelku Pulpitu
 async function checkForumUnreadNotifications() {
   if (!currentUserId) return;
 
@@ -707,8 +829,6 @@ function updateForumBadge(count) {
   }
 }
 
-// Nasłuchiwanie w czasie rzeczywistym
-let forumRealtimeChannel = null;
 function initForumRealtime() {
   if (forumRealtimeChannel) return;
 
@@ -832,7 +952,6 @@ function renderSingleTopicItem(t, allPosts, subData, isArchived) {
   const diffSec = (new Date() - dateObj) / 1000;
   const isAuthor = (t.created_by == currentUserId || (currentUser && author.toLowerCase() === currentUser.toLowerCase()));
 
-  // Sprawdzanie czy są nowe wpisy dla zalogowanego użytkownika
   let hasUnread = false;
   const isSubscribed = subData ? subData.is_subscribed : false;
   if (isSubscribed && subData.last_read_at && topicPosts.length > 0) {
@@ -1632,10 +1751,13 @@ function przeliczKantor() {
     ? Math.round(res).toLocaleString('pl-PL') 
     : res.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  document.getElementById("exResult").innerHTML = `
-    <div class="small text-muted mb-1">${rateLabelPrefix}: 1 ${from} = ${rate.toFixed(4)} ${to}</div>
-    <div class="fs-4 fw-bold" style="color:var(--burgund);">${formattedRes} ${to}</div>
-  `;
+  const exResult = document.getElementById("exResult");
+  if (exResult) {
+    exResult.innerHTML = `
+      <div class="small text-muted mb-1">${rateLabelPrefix}: 1 ${from} = ${rate.toFixed(4)} ${to}</div>
+      <div class="fs-4 fw-bold" style="color:var(--burgund);">${formattedRes} ${to}</div>
+    `;
+  }
 
   renderCheatsheet(from, to, rate);
 }
@@ -1689,7 +1811,7 @@ async function loadWallet() {
   const dueContainer = document.getElementById("walletDueList");
   const summaryEl = document.getElementById("walletTotalSummary");
 
-  if (!oweContainer || !dueContainer) return;
+  if (!oweContainer || !dueContainer || !summaryEl) return;
 
   oweContainer.innerHTML = "";
   dueContainer.innerHTML = "";
@@ -1820,10 +1942,16 @@ window.oznaczRozliczenie = async function(costId, entityKey, markAsSettled) {
 // 7. MODUŁ: RAZEM ZA BILETY
 // ==============================================================================
 function przeliczBilety() {
-  const cNorm = parseFloat(document.getElementById("calcNormal").value) || 0;
-  const cUlg = parseFloat(document.getElementById("calcReduced").value) || 0;
-  const wal = document.getElementById("calcCurrency").value;
+  const normInput = document.getElementById("calcNormal");
+  const ulgInput = document.getElementById("calcReduced");
+  const walInput = document.getElementById("calcCurrency");
   const out = document.getElementById("calcResults");
+
+  if (!normInput || !ulgInput || !walInput || !out) return;
+
+  const cNorm = parseFloat(normInput.value) || 0;
+  const cUlg = parseFloat(ulgInput.value) || 0;
+  const wal = walInput.value;
 
   let total, bKoszt, pKoszt, rKoszt, sKoszt;
   if (cUlg === 0) {
@@ -1983,41 +2111,47 @@ async function renderActiveGameRounds() {
   currentRoundNumber = maxRound;
 
   const compContainer = document.getElementById("completedRoundsList");
-  compContainer.innerHTML = "";
+  if (compContainer) {
+    compContainer.innerHTML = "";
 
-  for (let r = 1; r < maxRound; r++) {
-    const roundScores = scores.filter(s => s.round_number === r);
-    const scoreStr = roundScores.map(s => `<b>${s.player_name}:</b> ${s.points} pkt`).join(" | ");
-    
-    const row = document.createElement("div");
-    row.className = "round-collapsed-card d-flex justify-content-between align-items-center";
-    row.innerHTML = `<span><b>Runda ${r}:</b> ${scoreStr}</span> <span class="badge bg-secondary">Zakończona</span>`;
-    compContainer.appendChild(row);
+    for (let r = 1; r < maxRound; r++) {
+      const roundScores = scores.filter(s => s.round_number === r);
+      const scoreStr = roundScores.map(s => `<b>${s.player_name}:</b> ${s.points} pkt`).join(" | ");
+      
+      const row = document.createElement("div");
+      row.className = "round-collapsed-card d-flex justify-content-between align-items-center";
+      row.innerHTML = `<span><b>Runda ${r}:</b> ${scoreStr}</span> <span class="badge bg-secondary">Zakończona</span>`;
+      compContainer.appendChild(row);
+    }
   }
 
-  document.getElementById("currentRoundTitle").innerText = `Runda ${maxRound}`;
+  const roundTitle = document.getElementById("currentRoundTitle");
+  if (roundTitle) roundTitle.innerText = `Runda ${maxRound}`;
+
   const currentInputs = document.getElementById("currentRoundInputs");
-  currentInputs.innerHTML = "";
+  if (currentInputs) {
+    currentInputs.innerHTML = "";
 
-  const currRoundScores = scores.filter(s => s.round_number === maxRound);
+    const currRoundScores = scores.filter(s => s.round_number === maxRound);
 
-  activeGamePlayers.forEach(pName => {
-    const pScore = currRoundScores.find(s => s.player_name === pName);
-    const val = pScore ? pScore.points : 0;
+    activeGamePlayers.forEach(pName => {
+      const pScore = currRoundScores.find(s => s.player_name === pName);
+      const val = pScore ? pScore.points : 0;
 
-    const col = document.createElement("div");
-    col.className = "col-6";
-    col.innerHTML = `
-      <label class="small fw-bold text-muted">${pName}:</label>
-      <input type="number" 
-             class="form-control form-control-sm round-score-input" 
-             data-player="${pName}" 
-             value="${val}" 
-             onfocus="if(this.value==='0') this.value='';" 
-             onblur="if(this.value==='') this.value='0';">
-    `;
-    currentInputs.appendChild(col);
-  });
+      const col = document.createElement("div");
+      col.className = "col-6";
+      col.innerHTML = `
+        <label class="small fw-bold text-muted">${pName}:</label>
+        <input type="number" 
+               class="form-control form-control-sm round-score-input" 
+               data-player="${pName}" 
+               value="${val}" 
+               onfocus="if(this.value==='0') this.value='';" 
+               onblur="if(this.value==='') this.value='0';">
+      `;
+      currentInputs.appendChild(col);
+    });
+  }
 }
 
 const btnNextRound = document.getElementById("btnNextRound");
@@ -2084,21 +2218,23 @@ async function showPodium(gameId) {
   });
 
   const podiumList = document.getElementById("podiumList");
-  podiumList.innerHTML = "";
+  if (podiumList) {
+    podiumList.innerHTML = "";
 
-  sorted.forEach(([pName, totalPts], index) => {
-    let medal = `${index + 1}.`;
-    let rowClass = "podium-other";
+    sorted.forEach(([pName, totalPts], index) => {
+      let medal = `${index + 1}.`;
+      let rowClass = "podium-other";
 
-    if (index === 0) { medal = "🥇 1. miejsce"; rowClass = "podium-1"; }
-    else if (index === 1) { medal = "🥈 2. miejsce"; rowClass = "podium-2"; }
-    else if (index === 2) { medal = "🥉 3. miejsce"; rowClass = "podium-3"; }
+      if (index === 0) { medal = "🥇 1. miejsce"; rowClass = "podium-1"; }
+      else if (index === 1) { medal = "🥈 2. miejsce"; rowClass = "podium-2"; }
+      else if (index === 2) { medal = "🥉 3. miejsce"; rowClass = "podium-3"; }
 
-    const div = document.createElement("div");
-    div.className = `podium-row ${rowClass}`;
-    div.innerHTML = `<span><b>${medal}</b> ${pName}</span> <span class="badge bg-dark fs-6">${totalPts} pkt</span>`;
-    podiumList.appendChild(div);
-  });
+      const div = document.createElement("div");
+      div.className = `podium-row ${rowClass}`;
+      div.innerHTML = `<span><b>${medal}</b> ${pName}</span> <span class="badge bg-dark fs-6">${totalPts} pkt</span>`;
+      podiumList.appendChild(div);
+    });
+  }
 
   document.getElementById("activeGameArea").style.display = "none";
   document.getElementById("gameSetupCard").style.display = "none";
@@ -2152,16 +2288,6 @@ async function loadPastGames() {
 // 9. GLOBALNE LISTENERY ZDARZEŃ
 // ==============================================================================
 function setupEventListeners() {
-const btnHome = document.getElementById("btnCenterHome");
-  if (btnHome) {
-    btnHome.onclick = () => {
-      if (mapInstance) {
-        document.getElementById("mapContainer").scrollIntoView({ behavior: "smooth", block: "start" });
-        mapInstance.setView([DOM_LAT, DOM_LNG], 16);
-      }
-    };
-  }
-
   ["calcNormal", "calcReduced", "calcCurrency"].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.addEventListener("input", przeliczBilety);
@@ -2173,8 +2299,12 @@ const btnHome = document.getElementById("btnCenterHome");
   const customRateLabel = document.getElementById("exCustomRateLabel");
 
   const updateCustomLabel = () => {
-    const from = document.getElementById("exFrom").value;
-    const to = document.getElementById("exTo").value;
+    const fromEl = document.getElementById("exFrom");
+    const toEl = document.getElementById("exTo");
+    if (!fromEl || !toEl) return;
+
+    const from = fromEl.value;
+    const to = toEl.value;
     if (customRateLabel) {
       customRateLabel.innerText = `Własny kurs (1 ${from} = ? ${to}):`;
     }
@@ -2190,8 +2320,12 @@ const btnHome = document.getElementById("btnCenterHome");
       const isCustom = customToggle.checked;
       if (customRateContainer) customRateContainer.style.display = isCustom ? "block" : "none";
       
-      const from = document.getElementById("exFrom").value;
-      const to = document.getElementById("exTo").value;
+      const fromEl = document.getElementById("exFrom");
+      const toEl = document.getElementById("exTo");
+      if (!fromEl || !toEl) return;
+
+      const from = fromEl.value;
+      const to = toEl.value;
       const defaultRate = bazaKursow[`${from}_${to}`] || 1.0;
 
       if (isCustom && customRateInput && customRateLabel) {

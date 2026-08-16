@@ -165,56 +165,86 @@
       <!-- 1. MODUŁ: MAPA -->
       <!-- ========================================================================== -->
       <section id="tab-map" class="app-tab" style="display: none;">
-        <!-- Pasek tytułowy z przyciskiem powrotu do pulpitu -->
         <div class="d-flex align-items-center justify-content-between mb-3">
           <h4 class="fw-bold mb-0">🗺️ Mapa</h4>
           <button class="btn btn-sm btn-outline-secondary" onclick="switchTab('dashboard')"><i class="bi bi-arrow-left"></i> Wróć</button>
         </div>
 
-        <div id="mapContainer" style="height: 360px; width: 100%; border-radius: 14px;" class="shadow-sm mb-3"></div>
-        <button id="btnCenterHome" class="btn btn-outline-dark btn-sm w-100 mb-3">🏠 Centruj na: Ámbitus ház (Dom)</button>
-        <div id="addPlaceCard" class="card p-3 border-0 shadow-sm rounded-4 mb-3" style="display: none; background: #FFFFFF; border-left: 5px solid var(--burgund) !important;">
-          <h6 class="fw-bold mb-2" style="color: var(--burgund);">📍 Dodaj nowy punkt</h6>
-          <form id="formAddPlace">
-            <div class="mb-2">
-              <label class="small fw-bold">Nazwa miejsca:</label>
-              <input type="text" id="newPlaceName" class="form-control form-control-sm" placeholder="np. Restauracja Piwnica" required>
-            </div>
-            <div class="mb-3">
-              <label class="small fw-bold">Kategoria:</label>
-              <select id="newPlaceCategory" class="form-select form-select-sm">
-                <option value="Inne" selected>📌 Inne</option>
-                <option value="Termy">🏊 Termy</option>
-                <option value="Zwiedzanie">🏛️ Zwiedzanie</option>
-                <option value="Jedzenie">🍷 Jedzenie / Wino</option>
-              </select>
-            </div>
-            <div class="d-flex gap-2">
-              <button type="button" id="btnCancelAddPlace" class="btn btn-outline-secondary btn-sm w-50">Anuluj</button>
-              <button type="submit" class="btn btn-burgund btn-sm w-50">Zapisz punkt</button>
-            </div>
-          </form>
-        </div>
+        <div id="mapContainer" style="height: 360px; width: 100%; border-radius: 14px;" class="shadow-sm mb-2"></div>
 
-        <div class="mb-2">
-          <input type="text" id="placeSearchInput" class="form-control form-control-sm rounded-pill mb-2" placeholder="🔍 Szukaj atrakcji...">
-          <div class="d-flex gap-1 overflow-auto pb-1" id="categoryPills">
-            <button class="btn btn-sm btn-burgund rounded-pill px-3 filter-pill active" data-cat="termy">🏊 Termy</button>
-            <button class="btn btn-sm btn-outline-secondary rounded-pill px-3 filter-pill" data-cat="zwiedzanie">🏛️ Zwiedzanie</button>
-            <button class="btn btn-sm btn-outline-secondary rounded-pill px-3 filter-pill" data-cat="jedzenie">🍷 Jedzenie</button>
-            <button class="btn btn-sm btn-outline-secondary rounded-pill px-3 filter-pill" data-cat="inne">📌 Inne</button>
-            <button class="btn btn-sm btn-outline-secondary rounded-pill px-3 filter-pill" data-cat="all">All</button>
+        <!-- Przyciski nawigacyjne -->
+        <div class="row g-2 mb-2">
+          <div class="col-6">
+            <button id="btnMyLocation" class="btn btn-outline-primary btn-sm w-100 py-1" style="font-size: 0.82rem;">
+              <i class="bi bi-crosshair me-1"></i> Moja lokalizacja
+            </button>
+          </div>
+          <div class="col-6">
+            <button id="btnCenterHome" class="btn btn-outline-dark btn-sm w-100 py-1" style="font-size: 0.82rem;">
+              🏠 Dom (Ámbitus)
+            </button>
+          </div>
+          <div class="col-12">
+            <button id="btnToggleRadar" class="btn btn-sm btn-light border w-100 py-1 d-flex align-items-center justify-content-center gap-2" style="font-size: 0.8rem;">
+              <span id="radarStatusDot" class="rounded-circle bg-secondary" style="width: 8px; height: 8px; display: inline-block;"></span>
+              <span id="radarStatusText">Radar Stada w trasie: <b>Wyłączony</b></span>
+            </button>
           </div>
         </div>
 
-        <div id="placesList" class="list-group shadow-sm rounded-3 mb-4"></div>
-
-        <div class="offcanvas offcanvas-bottom rounded-top-4" tabindex="-1" id="placeDetailsSheet" style="height: auto; max-height: 85vh;">
-          <div class="offcanvas-header border-bottom py-2">
-            <h6 class="offcanvas-title fw-bold" id="sheetPlaceTitle" style="color: var(--burgund);">Szczegóły miejsca</h6>
-            <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas"></button>
+        <!-- Wyszukiwarka i filtry kategorii -->
+        <div class="card p-2 border-0 shadow-sm rounded-4 mb-3">
+          <input type="text" id="mapSearchInput" class="form-control form-control-sm mb-2" placeholder="🔍 Szukaj atrakcji lub adresu...">
+          <div class="d-flex gap-1 overflow-x-auto pb-1" id="mapFilterBadges">
+            <button class="btn btn-sm btn-outline-secondary px-2 py-1" data-cat="all">Wszystkie</button>
+            <button class="btn btn-sm btn-burgund px-2 py-1 active-filter" data-cat="Termy">Termy</button>
+            <button class="btn btn-sm btn-outline-secondary px-2 py-1" data-cat="Zwiedzanie">Zwiedzanie</button>
+            <button class="btn btn-sm btn-outline-secondary px-2 py-1" data-cat="Jedzenie">Jedzenie</button>
+            <button class="btn btn-sm btn-outline-secondary px-2 py-1" data-cat="Inne">Inne</button>
           </div>
-          <div class="offcanvas-body" id="sheetPlaceBody"></div>
+        </div>
+
+        <!-- Spis miejsc -->
+        <div class="card p-3 border-0 shadow-sm rounded-4 mb-4">
+          <h6 class="fw-bold mb-2" style="color: var(--burgund);">📍 Spis miejsc</h6>
+          <div id="mapPlacesList" class="list-group list-group-flush"></div>
+        </div>
+
+        <!-- Modal dodawania nowego punktu na mapie -->
+        <div class="modal fade" id="modalAddMapPoint" tabindex="-1">
+          <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content rounded-4 border-0 shadow">
+              <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold" style="color: var(--burgund);">➕ Dodaj nowe miejsce</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+              </div>
+              <div class="modal-body">
+                <form id="formAddMapPoint">
+                  <input type="hidden" id="newPointLat">
+                  <input type="hidden" id="newPointLng">
+                  
+                  <div class="mb-2">
+                    <label class="small fw-bold text-muted">Nazwa miejsca:</label>
+                    <input type="text" id="newPointName" class="form-control form-control-sm" required placeholder="np. Winiarnia u Istvána">
+                  </div>
+                  <div class="mb-2">
+                    <label class="small fw-bold text-muted">Kategoria:</label>
+                    <select id="newPointCategory" class="form-select form-select-sm">
+                      <option value="Termy">Termy</option>
+                      <option value="Zwiedzanie" selected>Zwiedzanie</option>
+                      <option value="Jedzenie">Jedzenie</option>
+                      <option value="Inne">Inne</option>
+                    </select>
+                  </div>
+                  <div class="mb-3">
+                    <label class="small fw-bold text-muted">Adres / krótki opis (opcjonalnie):</label>
+                    <input type="text" id="newPointAddress" class="form-control form-control-sm" placeholder="np. Eger, Dolina Pięknej Pani">
+                  </div>
+                  <button type="submit" class="btn btn-burgund btn-sm w-100 py-2">Zapisz na mapie</button>
+                </form>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
