@@ -1,7 +1,7 @@
 ========================================================================
              DOKUMENTACJA PROJEKTU: APLIKACJA "WAKACJE STADA 2026"
 ========================================================================
-Ostatnia aktualizacja: 16.08.2026 r.
+Ostatnia aktualizacja: 17.08.2026 r.
 Autor: JBP
 Status projektu: Produkcyjny / PWA (Vanilla JS + Supabase BaaS)
 
@@ -10,9 +10,10 @@ Status projektu: Produkcyjny / PWA (Vanilla JS + Supabase BaaS)
 * Frontend & Architektura: Single Page Application (SPA) w układzie 
   Hub-and-Spoke, czysty Vanilla JavaScript (ES6+), HTML5 oraz CSS3 Mobile First.
 * Framework UI & Ikony: Bootstrap 5.3.3 oraz Bootstrap Icons.
-* Mapy i Warstwa Przestrzenna: Leaflet.js 1.9.4 z kafelkami OpenStreetMap.
+* Mapy i Warstwa Przestrzenna: Leaflet.js 1.9.4 z kafelkami OpenStreetMap 
+  oraz natywne API Geolocation przeglądarki.
 * Backend & Baza Danych: Supabase (PostgreSQL 15, protokół Realtime, 
-  funkcja RPC login_user do autoryzacji) poprzez bibliotekę @supabase/supabase-js v2.
+  triggery PL/pgSQL, funkcja RPC login_user) poprzez @supabase/supabase-js v2.
 * PWA & Zarządzanie Cache: Web App Manifest (manifest.json), praca w trybie 
   pełnoekranowym na smartfonach oraz mechanizm cache-bustera (?t=Date.now()).
 * Kursy Walut: Frankfurter API (kursy referencyjne Europejskiego Banku 
@@ -20,28 +21,35 @@ Status projektu: Produkcyjny / PWA (Vanilla JS + Supabase BaaS)
 
 2. STRUKTURA BAZY DANYCH (SUPABASE REPOSITORIES)
 ------------------------------------------------------------------------
-* users: id, login, team, spouse_id.
+* users: id, login, full_name, icon, spouse_id, team, passcode, age, descriptions.
 * map: id, name, category, address, lat, lng, photo, distance_from_egerszalok, 
   opening_hours, prices, official_url, created_by.
+* user_locations: user_id (PK/FK), login, team, lat, lng, updated_at.
 * costs: id, created_at, created_by, paid_by, amount, currency (HUF/PLN/EUR), 
   cost_name, borrower, comment, is_private, settled_by, deleted.
 * shoppinglists: id, created_at, created_by, closed.
-* shoppingitems: id, list_id, product_name, bought.
+* shoppingitems: id, list_id, product_name, bought, created_at.
 * games: id, created_at, created_by, game_name, low_score_wins, finished.
-* gamescores: id, game_id, round_number, player_name, points.
+* gamescores: id, game_id, round_number, player_name, points, created_at.
 * forum_topics: id, created_at, created_by, title, is_archived, deleted.
 * forum: id, created_at, created_by, topic_id, comment, deleted.
+* forum_likes: id, post_id (FK), user_id (FK), created_at, UNIQUE(post_id, user_id).
+* forum_subscriptions: id, topic_id (FK), user_id (FK), is_subscribed, 
+  last_read_at, UNIQUE(topic_id, user_id).
 
 3. ARCHITEKTURA SYSTEMU I INTERFEJS
 ------------------------------------------------------------------------
-* Nawigacja Hub-and-Spoke: Całkowite wyeliminowanie sidebara na rzecz centralnego 
-  Pulpitu. Kliknięcie w nagłówek lub logo natychmiast przenosi na Pulpit.
+* Nawigacja Hub-and-Spoke: Centralny Pulpit z szybkim powrotem. Każdy moduł 
+  posiada spójny przycisk "Wróć" w nagłówku (w Forum również na dole ekranu).
 * Sesja i Pamięć Lokalna: Trwałe logowanie oraz zapamiętywanie aktywnego 
   widoku w localStorage (stado_user, stado_token, active_tab, forum_active_topic_id).
-* Autoryzacja i Profile: Weryfikacja hasła przez RPC oraz dynamiczne ładowanie 
-  awatarów (assets/avatars/<login> z fallbackiem do generatora UI-Avatars).
-* Bezpieczeństwo i Usuwanie: Okno czasowe 60 sekund od momentu publikacji 
-  na usunięcie wpisu przez autora (moduły Wydatki oraz Forum).
+* Autoryzacja i Profile: Weryfikacja hasła przez RPC oraz kaskadowe ładowanie 
+  awatarów (assets/avatars/<login>.jpg -> .jpeg -> UI-Avatars).
+* Bezpieczeństwo i Uprawnienia: Okno czasowe 60 sekund od momentu publikacji 
+  na usunięcie wpisu przez autora (Wydatki oraz Forum). Zarządzanie statusem wątku 
+  (archiwizacja/przywrócenie) zastrzeżone wyłącznie dla autora wątku.
+* Powiadomienia w Czasie Rzeczywistym: Kanały Realtime w Supabase automatycznie 
+  aktualizują stan licznika nowych wiadomości oraz zawartość otwartych wątków.
 
 4. ZAKRES FUNKCJONALNOŚCI (MODUŁY)
 ------------------------------------------------------------------------
@@ -50,48 +58,71 @@ Status projektu: Produkcyjny / PWA (Vanilla JS + Supabase BaaS)
    - Personalizowany pasek z awatarem użytkownika i powitaniem.
    - Kalendarz z polskim nazewnictwem dni/miesięcy oraz automatycznym 
      odliczaniem dni do wyjazdu (19 sierpnia 2026 r.).
-   - Siatka 8 kafelków nawigacyjnych w estetyce Glassmorphism.
+   - Dynamiczny wskaźnik badge "● N nowe" na kafelku Forum informujący 
+     o nieprzeczytanych wiadomościach w obserwowanych wątkach.
+   - Siatka kafelków nawigacyjnych w estetyce Glassmorphism.
 
 1. MODUŁ: MAPA
-   - Domyślna lokalizacja: Ámbitus ház w Egerszalók (Sáfrány út 38/a).
-   - Przycisk szybkiego centrowania widoku na dom.
-   - Kolorystyczne kodowanie pinezek: Termy (niebieski), Zwiedzanie (bursztyn), 
-     Jedzenie i Wino (zieleń), Inne (szary).
-   - Wyszukiwarka tekstowa oraz filtry kategorii.
-   - Wysuwany panel dolny ze szczegółami atrakcji, godzinami, biletami 
-     i bezpośrednią nawigacją Google Maps.
-   - Dodawanie własnych punktów przez kliknięcie na mapie.
+   - Baza stała: Ámbitus ház w Egerszalók (Sáfrány utca 36/a) ze stałą, bordową 
+     pinezką domu (🏠), wyświetlaną ZAWSZE, niezależnie od wybranego filtra.
+   - Kontrolki kadru:
+     * Przycisk globusa (🌐) w pasku zoomu Leaflet – automatyczne dopasowanie 
+       zasięgu mapy (fitBounds) do aktualnie przefiltrowanych punktów.
+     * Przycisk "🏠 Dom (Ámbitus)" – natychmiastowe wycentrowanie na kwaterę.
+     * Przycisk "📍 Moja lokalizacja" – pobranie pozycji GPS telefonu, płynne 
+       przybliżenie i naniesienie pulsującego, niebieskiego punktu.
+   - Radar Stada w trasie:
+     * Przełącznik aktywacji nadawania pozycji GPS (co 30 sekund do bazy).
+     * Wyświetlanie załóg na trasie w postaci okrągłych awatarów ze zdjęciem, 
+       nazwą ekipy i znacznikiem czasu ostatniej aktywności.
+   - Filtry kategorii: Domyślnie zaznaczona kategoria "Termy". Filtry: Termy, 
+     Zwiedzanie, Jedzenie, Inne oraz Wszystkie.
+   - Wyszukiwarka tekstowa i lista miejsc z bezpośrednią nawigacją "🚗 Jedź".
+   - Dodawanie miejsc: Kliknięcie w dowolne miejsce na mapie otwiera czysty modal 
+     Bootstrapa z polami: nazwa, kategoria, opis/adres.
 
 2. MODUŁ: FORUM DYSKUSYJNE
-   - Przejrzysty podział na wątki tematyczne.
-   - Wbudowany edytor tekstu (pogrubienie, kursywa, podkreślenie, kolor czcionki).
-   - Zwijane archiwum wątków i licznik postów.
-   - Automatyczne przywracanie ostatnio czytanego wątku po odświeżeniu.
+   - Podział na aktywne wątki oraz zwijaną sekcję archiwum.
+   - Pełny edytor formatowania tekstu (Bold, Italic, Underline, próbnik koloru) 
+     z zabezpieczeniem przed utratą fokusu kursora.
+   - Wzmianki użytkowników (@Imię):
+     * Automatyczne podświetlanie wzmianki na bordowo z pogrubieniem w edytorze.
+     * Automatyczne włączenie obserwacji wątku (dzwoneczek) u oznaczonej osoby.
+   - Reakcje (Serduszka / Lajki):
+     * Możliwość polubienia wpisu (max 1 lajk na osobę).
+     * Płynna zmiana stanu serduszka bez przeładowywania i bez skakania ekranu.
+     * Brak publicznego podglądu listy lajkujących (tylko łączny licznik).
+   - System Subskrypcji i Powiadomień (Dzwoneczek 🔔):
+     * Automatyczne włączenie obserwacji tylko dla: autora wątku, autora komentarza, 
+       osoby oznaczonej (@) lub po ręcznym kliknięciu dzwoneczka.
+     * Samo wejście i przeczytanie wątku gasi etykietę "NOWE", nie wymuszając subskrypcji.
+     * Wskaźniki nieprzeczytanych wpisów na Pulpicie oraz przy tytułach wątków.
+   - Ergonomia: Zdublowany przycisk "Wróć do wątków" na samym dole widoku postów.
 
 3. MODUŁ: WYDATKI
-   - Ewidencja kosztów w 3 walutach: HUF, PLN, EUR.
-   - Tryb wydatku prywatnego (widoczny tylko dla płatnika i partnera).
-   - Rozliczenia: Całe Stado (podział na 4 ekipy), wybrane ekipy lub konkretne osoby.
-   - Grupowanie historii transakcji według dni.
+   - Ewidencja kosztów w 3 walutach: HUF, PLN, EUR z automatycznym przeliczaniem.
+   - Tryb wydatku prywatnego (widoczny tylko dla płatnika i małżonka/partnera).
+   - Elastyczny podział: Całe Stado (4 ekipy), wybrane ekipy lub konkretne osoby.
+   - Grupowanie historii transakcji według dni z 60-sekundowym oknem na usunięcie.
 
 4. MODUŁ: ZAKUPY
    - Obsługa wielu list numerowanych sekwencyjnie (#1, #2...).
-   - Podpowiedzi produktów (autocomplete) na bazie bazy danych.
-   - Dynamiczne skreślanie zakupionych artykułów.
-   - Automatyczny modal finalizacji po skreśleniu wszystkich pozycji 
-     i bezpośrednie zasilenie modułu Wydatki.
+   - Autouzupełnianie i podpowiedzi produktów na podstawie historii zakupów.
+   - Dynamiczne skreślanie kupionych artykułów.
+   - Automatyczny modal finalizacji po odznaczeniu wszystkich pozycji 
+     z bezpośrednim zasileniem modułu Wydatki.
 
 5. MODUŁ: KANTOR
-   - Pobieranie oficjalnych kursów rynkowych EBC.
+   - Pobieranie oficjalnych kursów rynkowych EBC w czasie rzeczywistym.
    - Dwustronny kalkulator z przyciskiem szybkiej zamiany walut (⇄).
    - Szybkie przyciski kwot (1 000, 3 000, 5 000, 10 000, 20 000 HUF).
-   - Możliwość ustawienia własnego kursu wymiany.
+   - Opcja kalkulacji według własnego, zdefiniowanego kursu wymiany.
    - Podręczna 5-rzędowa ściągawka przeliczeń.
 
 6. MODUŁ: PORTFEL
-   - Dwustronny bilans wzajemnych rozliczeń sprowadzony do waluty HUF.
-   - Podział na sekcje: Do oddania innym oraz Do odebrania od innych.
-   - Interaktywne oznaczanie spłaty (Rozliczono / Do rozliczenia).
+   - Dwustronny bilans wzajemnych rozliczeń sprowadzony do waluty bazowej HUF.
+   - Podział na sekcje: "Do oddania innym" oraz "Do odebrania od innych".
+   - Interaktywne oznaczanie statusu spłaty (Rozliczono / Do rozliczenia).
 
 7. MODUŁ: RAZEM ZA BILETY
    - Kalkulator biletów grupowych dla całej 15-osobowej grupy.
@@ -102,4 +133,4 @@ Status projektu: Produkcyjny / PWA (Vanilla JS + Supabase BaaS)
    - Szablony gier: Blokus, 1000, Remik, Carcassonne oraz gry własne.
    - Obsługa reguły odwróconej punktacji (najmniej punktów wygrywa w Blokusie).
    - Rejestracja kolejnych rund i sumowanie punktów na bieżąco.
-   - Automatyczne generowanie podium z medalami oraz archiwum gier.
+   - Automatyczne generowanie podium z medalami oraz archiwum zakończonych gier.
