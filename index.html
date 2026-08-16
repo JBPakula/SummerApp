@@ -272,10 +272,12 @@
               <input type="text" id="newTopicTitle" class="form-control form-control-sm mb-2" placeholder="Wpisz temat dyskusji...">
 
               <label class="small fw-bold text-muted mb-1">Treść pierwszej wiadomości:</label>
+              light rounded border">
+                <!-- Pasek formatowania w nowym wątku -->
               <div class="d-flex align-items-center gap-1 mb-2 p-1 bg-light rounded border">
-                <button type="button" class="btn btn-sm btn-outline-dark fw-bold px-2 py-0" onclick="formatTopicDoc('bold')" title="Pogrubienie">B</button>
-                <button type="button" class="btn btn-sm btn-outline-dark fst-italic px-2 py-0" onclick="formatTopicDoc('italic')" title="Kursywa">I</button>
-                <button type="button" class="btn btn-sm btn-outline-dark text-decoration-underline px-2 py-0" onclick="formatTopicDoc('underline')" title="Podkreślenie">U</button>
+                <button type="button" class="btn btn-sm btn-outline-dark fw-bold px-2 py-0" onmousedown="event.preventDefault()" onclick="formatTopicDoc('bold')" title="Pogrubienie">B</button>
+                <button type="button" class="btn btn-sm btn-outline-dark fst-italic px-2 py-0" onmousedown="event.preventDefault()" onclick="formatTopicDoc('italic')" title="Kursywa">I</button>
+                <button type="button" class="btn btn-sm btn-outline-dark text-decoration-underline px-2 py-0" onmousedown="event.preventDefault()" onclick="formatTopicDoc('underline')" title="Podkreślenie">U</button>
                 <div class="vr mx-1"></div>
                 <label class="small fw-bold text-muted me-1" style="font-size: 11px;">Kolor:</label>
                 <input type="color" class="form-control form-control-color form-control-sm p-0 border-0" value="#4A1525" style="width: 26px; height: 26px; cursor: pointer;" onchange="formatTopicDoc('foreColor', this.value)" title="Wybierz kolor tekstu">
@@ -320,10 +322,11 @@
           <div class="card p-3 border-0 shadow-sm rounded-4 mb-4">
             <h6 class="fw-bold mb-2" style="color: var(--burgund);">✍️ Napisz odpowiedź</h6>
             
+           <!-- Pasek formatowania w odpowiedzi -->
             <div class="d-flex align-items-center gap-1 mb-2 p-1 bg-light rounded border">
-              <button type="button" class="btn btn-sm btn-outline-dark fw-bold px-2 py-0" onclick="formatReplyDoc('bold')" title="Pogrubienie">B</button>
-              <button type="button" class="btn btn-sm btn-outline-dark fst-italic px-2 py-0" onclick="formatReplyDoc('italic')" title="Kursywa">I</button>
-              <button type="button" class="btn btn-sm btn-outline-dark text-decoration-underline px-2 py-0" onclick="formatReplyDoc('underline')" title="Podkreślenie">U</button>
+              <button type="button" class="btn btn-sm btn-outline-dark fw-bold px-2 py-0" onmousedown="event.preventDefault()" onclick="formatReplyDoc('bold')" title="Pogrubienie">B</button>
+              <button type="button" class="btn btn-sm btn-outline-dark fst-italic px-2 py-0" onmousedown="event.preventDefault()" onclick="formatReplyDoc('italic')" title="Kursywa">I</button>
+              <button type="button" class="btn btn-sm btn-outline-dark text-decoration-underline px-2 py-0" onmousedown="event.preventDefault()" onclick="formatReplyDoc('underline')" title="Podkreślenie">U</button>
               <div class="vr mx-1"></div>
               <label class="small fw-bold text-muted me-1" style="font-size: 11px;">Kolor:</label>
               <input type="color" class="form-control form-control-color form-control-sm p-0 border-0" value="#4A1525" style="width: 26px; height: 26px; cursor: pointer;" onchange="formatReplyDoc('foreColor', this.value)" title="Wybierz kolor tekstu">

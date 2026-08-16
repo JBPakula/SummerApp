@@ -696,7 +696,7 @@ async function sendAndFetchRadarLocations() {
 }
 
 // ==============================================================================
-// 2. MODUŁ: FORUM DYSKUSYJNE
+// 2. MODUŁ: FORUM DYSKUSYJNE (POPRAWIONE FORMATOWANIE, WZMIANKI, LAJKI I POWIADOMIENIA)
 // ==============================================================================
 function renderAvatarHtml(login) {
   if (!login) return `<span class="forum-avatar-placeholder me-2">👤</span>`;
@@ -707,20 +707,20 @@ function renderAvatarHtml(login) {
     <img src="assets/avatars/${cleanLogin}.jpg" 
          class="forum-avatar me-2" 
          alt="${cleanLogin}" 
-         onerror="if(this.src.endsWith('.jpg')){ this.src='assets/avatars/${cleanLogin}.jpeg'; } else if(this.src.endsWith('.jpeg')){ this.src='assets/avatars/${cleanLogin}.png'; } else { this.onerror=null; this.src='${fallbackUrl}'; }">
+         onerror="if(this.src.endsWith('.jpg')){ this.src='assets/avatars/${cleanLogin}.jpeg'; } else { this.onerror=null; this.src='${fallbackUrl}'; }">
   `;
 }
 
 function formatTopicDoc(cmd, value = null) {
-  document.execCommand(cmd, false, value);
   const el = document.getElementById("newTopicFirstPost");
   if (el) el.focus();
+  document.execCommand(cmd, false, value);
 }
 
 function formatReplyDoc(cmd, value = null) {
-  document.execCommand(cmd, false, value);
   const el = document.getElementById("forumPostEditor");
   if (el) el.focus();
+  document.execCommand(cmd, false, value);
 }
 
 async function pobierzUzytkownikowForum() {
@@ -736,6 +736,39 @@ async function pobierzUzytkownikowForum() {
   }
 }
 
+// 1. Podświetlanie @Wzmianek na żywo w edytorze (Bordowy pogrubiony tekst)
+function attachMentionHighlighter(editorId) {
+  const editor = document.getElementById(editorId);
+  if (!editor) return;
+
+  editor.addEventListener("keyup", (e) => {
+    if (e.key === " " || e.key === "Enter") {
+      pobierzUzytkownikowForum().then(() => {
+        let text = editor.innerHTML;
+        let changed = false;
+
+        forumUserLogins.forEach(uLogin => {
+          const regex = new RegExp(`(?<!<span class="forum-mention-badge"[^>]*>)@(${uLogin})\\b`, "gi");
+          if (regex.test(text)) {
+            text = text.replace(regex, `<span class="forum-mention-badge" contenteditable="false">@$1</span>&nbsp;`);
+            changed = true;
+          }
+        });
+
+        if (changed) {
+          editor.innerHTML = text;
+          const range = document.createRange();
+          const sel = window.getSelection();
+          range.selectNodeContents(editor);
+          range.collapse(false);
+          sel.removeAllRanges();
+          sel.addRange(range);
+        }
+      });
+    }
+  });
+}
+
 function parseMentionsInHtml(htmlText) {
   if (!htmlText) return "";
   let cleanText = htmlText.replace(/<span class="forum-mention-badge"[^>]*>(@\w+)<\/span>/gi, "$1");
@@ -744,17 +777,6 @@ function parseMentionsInHtml(htmlText) {
     cleanText = cleanText.replace(regex, `<span class="forum-mention-badge">@$1</span>`);
   });
   return cleanText;
-}
-
-function attachMentionHighlighter(editorId) {
-  const editor = document.getElementById(editorId);
-  if (!editor) return;
-
-  editor.addEventListener("blur", () => {
-    if (!editor.innerHTML.includes('<span class="forum-mention-badge"')) {
-      editor.innerHTML = parseMentionsInHtml(editor.innerHTML);
-    }
-  });
 }
 
 async function subscribeMentionedUsers(rawHtml, topicId) {
@@ -782,41 +804,62 @@ async function subscribeMentionedUsers(rawHtml, topicId) {
   }
 }
 
+// 2. Niezawodne sprawdzanie powiadomień (dla Pulpitu)
 async function checkForumUnreadNotifications() {
   if (!currentUserId) return;
 
   try {
-    const { data: subs } = await supabaseClient
-      .from("forum_subscriptions")
-      .select("topic_id, last_read_at")
-      .eq("user_id", currentUserId)
-      .eq("is_subscribed", true);
+    // Pobierz wszystkie aktywne wątki
+    const { data: topics } = await supabaseClient
+      .from("forum_topics")
+      .select("id, created_at, created_by")
+      .eq("deleted", false)
+      .eq("is_archived", false);
 
-    if (!subs || subs.length === 0) {
+    if (!topics || topics.length === 0) {
       updateForumBadge(0);
       return;
     }
 
-    const topicIds = subs.map(s => s.topic_id);
+    // Pobierz posty innych użytkowników
     const { data: posts } = await supabaseClient
       .from("forum")
       .select("topic_id, created_at, created_by")
-      .in("topic_id", topicIds)
       .neq("created_by", currentUserId)
       .eq("deleted", false);
 
-    let unreadTopicsCount = 0;
-    if (posts) {
-      subs.forEach(s => {
-        const lastReadTime = s.last_read_at ? new Date(s.last_read_at).getTime() : 0;
-        const hasUnread = posts.some(p => p.topic_id === s.topic_id && new Date(p.created_at).getTime() > (lastReadTime + 1000));
-        if (hasUnread) unreadTopicsCount++;
-      });
-    }
+    // Pobierz ustawienia subskrypcji zalogowanego użytkownika
+    const { data: subs } = await supabaseClient
+      .from("forum_subscriptions")
+      .select("topic_id, is_subscribed, last_read_at")
+      .eq("user_id", currentUserId);
 
-    updateForumBadge(unreadTopicsCount);
+    const subMap = {};
+    if (subs) subs.forEach(s => subMap[s.topic_id] = s);
+
+    let unreadCount = 0;
+
+    topics.forEach(t => {
+      const sub = subMap[t.id];
+      const isSubbed = sub ? sub.is_subscribed : true; // Domyślnie subskrybowany
+      if (!isSubbed) return;
+
+      const lastRead = sub?.last_read_at ? new Date(sub.last_read_at).getTime() : 0;
+
+      // Sprawdź czy sam wątek jest nowy
+      const isNewTopic = (t.created_by != currentUserId && new Date(t.created_at).getTime() > (lastRead + 1000));
+
+      // Sprawdź czy są nowe komentarze w wątku
+      const hasNewPosts = posts ? posts.some(p => p.topic_id === t.id && new Date(p.created_at).getTime() > (lastRead + 1000)) : false;
+
+      if (isNewTopic || hasNewPosts) {
+        unreadCount++;
+      }
+    });
+
+    updateForumBadge(unreadCount);
   } catch (err) {
-    console.warn("Błąd sprawdzania powiadomień forum:", err);
+    console.warn("Błąd powiadomień forum:", err);
   }
 }
 
@@ -844,6 +887,10 @@ function initForumRealtime() {
       } else {
         loadTopics();
       }
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'forum_topics' }, () => {
+      checkForumUnreadNotifications();
+      if (!currentTopicId) loadTopics();
     })
     .subscribe();
 }
@@ -955,12 +1002,13 @@ function renderSingleTopicItem(t, allPosts, subData, isArchived) {
   const diffSec = (new Date() - dateObj) / 1000;
   const isAuthor = (t.created_by == currentUserId || (currentUser && author.toLowerCase() === currentUser.toLowerCase()));
 
-  let hasUnread = false;
-  const isSubscribed = subData ? subData.is_subscribed : false;
-  if (isSubscribed && subData.last_read_at && topicPosts.length > 0) {
-    const lastRead = new Date(subData.last_read_at).getTime();
-    hasUnread = topicPosts.some(p => p.created_by != currentUserId && new Date(p.created_at).getTime() > (lastRead + 1000));
-  }
+  // Sprawdzanie czy są nowe wpisy dla zalogowanego użytkownika
+  const isSubscribed = subData ? subData.is_subscribed : true;
+  const lastRead = subData?.last_read_at ? new Date(subData.last_read_at).getTime() : 0;
+  
+  const isNewTopic = (t.created_by != currentUserId && dateObj.getTime() > (lastRead + 1000));
+  const hasNewPosts = topicPosts.some(p => p.created_by != currentUserId && new Date(p.created_at).getTime() > (lastRead + 1000));
+  const hasUnread = isSubscribed && (isNewTopic || hasNewPosts);
 
   let actionBtnHtml = "";
   if (isAuthor) {
@@ -1066,13 +1114,29 @@ async function openTopicById(topicId) {
 
   await pobierzUzytkownikowForum();
 
+  // 1. Sprawdzamy, czy użytkownik ma już wpis subskrypcji dla tego wątku
   if (currentUserId) {
-    await supabaseClient.from("forum_subscriptions").upsert({
-      topic_id: currentTopicId,
-      user_id: currentUserId,
-      is_subscribed: true,
-      last_read_at: new Date().toISOString()
-    }, { onConflict: 'topic_id, user_id' });
+    const { data: existingSub } = await supabaseClient
+      .from("forum_subscriptions")
+      .select("id, is_subscribed")
+      .eq("topic_id", currentTopicId)
+      .eq("user_id", currentUserId)
+      .maybeSingle();
+
+    if (existingSub) {
+      // Jeśli rekord istnieje (np. wyciszony lub subskrybowany) -> aktualizujemy TYLKO czas przeczytania, nie ruszając is_subscribed
+      await supabaseClient.from("forum_subscriptions").update({
+        last_read_at: new Date().toISOString()
+      }).eq("id", existingSub.id);
+    } else {
+      // Jeśli rekordu brak -> tworzymy go z is_subscribed = false (samo wejście NIE włącza dzwoneczka)
+      await supabaseClient.from("forum_subscriptions").insert({
+        topic_id: currentTopicId,
+        user_id: currentUserId,
+        is_subscribed: false,
+        last_read_at: new Date().toISOString()
+      });
+    }
   }
 
   const { data: topic, error } = await supabaseClient
@@ -1140,7 +1204,8 @@ async function setupSubscriptionBell(topicId) {
     .eq("user_id", currentUserId)
     .maybeSingle();
 
-  let isSubbed = sub ? sub.is_subscribed : true;
+  // Domyślnie dzwoneczek jest wyłączony, chyba że jest w bazie is_subscribed = true (autor / post / wzmianka)
+  let isSubbed = sub ? sub.is_subscribed : false;
   renderBellIcon(isSubbed);
 
   btnBell.onclick = async () => {
@@ -1243,9 +1308,9 @@ async function loadPosts(topicId) {
           ${formattedComment}
         </div>
         <div class="d-flex justify-content-end align-items-center pt-1 border-top">
-          <button class="btn-forum-like ${isLiked ? 'liked' : ''}" onclick="toggleLike(${p.id})">
+          <button class="btn-forum-like ${isLiked ? 'liked' : ''}" onclick="toggleLike(${p.id}, this)">
             <i class="bi ${isLiked ? 'bi-heart-fill' : 'bi-heart'}"></i>
-            <span>${likeCount > 0 ? likeCount : ''}</span>
+            <span class="like-counter">${likeCount > 0 ? likeCount : ''}</span>
           </button>
         </div>
       </div>
@@ -1253,26 +1318,31 @@ async function loadPosts(topicId) {
   }).join("");
 }
 
-window.toggleLike = async function(postId) {
-  if (!currentUserId) return;
+// 3. Płynne polubienie bez przewijania ekranu
+window.toggleLike = async function(postId, btnElement) {
+  if (!currentUserId || !btnElement) return;
 
-  const { data: existing } = await supabaseClient
-    .from("forum_likes")
-    .select("id")
-    .eq("post_id", postId)
-    .eq("user_id", currentUserId)
-    .maybeSingle();
+  const icon = btnElement.querySelector("i");
+  const countSpan = btnElement.querySelector(".like-counter");
+  const isLiked = btnElement.classList.contains("liked");
 
-  if (existing) {
-    await supabaseClient.from("forum_likes").delete().eq("id", existing.id);
+  let count = parseInt(countSpan.innerText, 10) || 0;
+
+  if (isLiked) {
+    btnElement.classList.remove("liked");
+    icon.className = "bi bi-heart";
+    count = Math.max(0, count - 1);
+    countSpan.innerText = count > 0 ? count : "";
+
+    await supabaseClient.from("forum_likes").delete().eq("post_id", postId).eq("user_id", currentUserId);
   } else {
-    await supabaseClient.from("forum_likes").insert({
-      post_id: postId,
-      user_id: currentUserId
-    });
-  }
+    btnElement.classList.add("liked");
+    icon.className = "bi bi-heart-fill";
+    count = count + 1;
+    countSpan.innerText = count;
 
-  if (currentTopicId) loadPosts(currentTopicId);
+    await supabaseClient.from("forum_likes").insert({ post_id: postId, user_id: currentUserId });
+  }
 };
 
 const btnSendPost = document.getElementById("btnSendPost");
