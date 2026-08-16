@@ -664,16 +664,24 @@ async function sendAndFetchRadarLocations() {
             const cleanLogin = loc.login.trim();
             const avatarUrl = `assets/avatars/${cleanLogin}.jpg`;
 
-            const carIcon = L.divIcon({
-              className: 'custom-pin-wrapper',
-              html: `
-                <div class="radar-car-pin" style="width: 32px; height: 32px;" title="${loc.login} (${loc.team})">
-                  <img src="${avatarUrl}" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(cleanLogin)}&background=4A1525&color=fff&size=64'">
-                </div>
-              `,
-              iconSize: [32, 32],
-              iconAnchor: [16, 16]
-            });
+            // Wewnątrz sendAndFetchRadarLocations() w pętli locations.forEach:
+const cleanLogin = loc.login.trim();
+const fallbackUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(cleanLogin)}&background=4A1525&color=fff&size=64`;
+
+const carIcon = L.divIcon({
+  className: 'custom-pin-wrapper',
+  html: `
+    <div class="radar-car-pin" style="width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--burgund); background: #FFFFFF; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.35);" title="${loc.login} (${loc.team})">
+      <img src="assets/avatars/${cleanLogin}.jpg" 
+           style="width: 100%; height: 100%; object-fit: cover;" 
+           alt="${cleanLogin}"
+           onerror="if(this.src.endsWith('.jpg')){ this.src='assets/avatars/${cleanLogin}.jpeg'; } else { this.onerror=null; this.src='${fallbackUrl}'; }">
+    </div>
+  `,
+  iconSize: [34, 34],
+  iconAnchor: [17, 17],
+  popupAnchor: [0, -17]
+});
 
             const marker = L.marker([loc.lat, loc.lng], { icon: carIcon });
             marker.bindPopup(`
