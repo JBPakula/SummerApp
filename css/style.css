@@ -529,51 +529,81 @@ a.btn-trasa-gmaps * {
 }
 
 /* ==============================================================================
-   MODUŁ: PAMIĘTNIKI Z WAKACJI
+   MODUŁ: PAMIĘTNIKI Z WAKACJI (PARADOKUMENT / POLSAT VIBE)
 ============================================================================== */
 .diary-card {
   background: #FFFFFF;
-  border-radius: 14px;
-  border: 1px solid #E2E8F0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  border-radius: 12px;
+  border: 1px solid #D1D5DB;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   overflow: hidden;
-  margin-bottom: 14px;
+  margin-bottom: 16px;
+  position: relative;
 }
 
+/* Belka telewizyjna jak z "setki" w paradokumencie */
 .diary-header-badge {
-  background: #FFF5F7;
-  border-bottom: 1px solid #FFE4E8;
+  background: linear-gradient(135deg, #1E1B18 0%, #2D1A22 60%, var(--burgund) 100%);
+  border-bottom: 3px solid #F59E0B; /* Polsatowski żółto-złoty pasek */
   padding: 8px 12px;
+  color: #FFFFFF;
 }
 
+/* Awatar z żółtą telewizyjną obwódką */
+.diary-header-badge img.forum-avatar,
+.diary-header-badge .forum-avatar-placeholder {
+  border: 2px solid #F59E0B !important;
+  box-shadow: 0 0 6px rgba(245, 158, 11, 0.5);
+}
+
+/* Podpis bohatera (Wielkie litery, mocny kontrast) */
 .diary-author-name {
-  color: var(--burgund);
-  font-weight: 700;
-  font-size: 0.95rem;
-}
-
-.diary-author-tagline {
-  color: #64748B;
-  font-size: 0.78rem;
-  font-style: italic;
-  line-height: 1.25;
-  margin-top: 1px;
-}
-
-.diary-quote-box {
-  background: #F8FAFC;
-  border-left: 4px solid var(--burgund);
-  border-radius: 0 8px 8px 0;
-  padding: 10px 14px;
+  color: #FFFFFF;
+  font-weight: 800;
   font-size: 0.92rem;
-  font-style: italic;
-  color: #1E293B;
-  line-height: 1.45;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
 }
 
+/* Pasek opisu postaci z paradokumentu */
+.diary-author-tagline {
+  color: #FEF3C7; /* Ciepły, kremowo-żółty odcień */
+  font-size: 0.78rem;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 1.2;
+  margin-top: 2px;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+/* Ramka na cytat / złotą myśl stylizowana na telewizyjne napisy dialogowe */
+.diary-quote-box {
+  background: #18181B; /* Ciemny kadr filmowy */
+  color: #FDE047; /* Żółte napisy dialogowe jak w telewizji */
+  border-left: 4px solid #F59E0B;
+  border-radius: 6px;
+  padding: 12px 14px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  font-style: italic;
+  line-height: 1.45;
+  box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+/* Zdjęcie w kadrze reality show */
 .diary-photo-preview {
   width: 100%;
   max-height: 350px;
   object-fit: cover;
-  border-radius: 8px;
+  border-radius: 6px;
+  border: 1px solid #18181B;
+}
+
+/* Biała data i godzina w nagłówku belki */
+.diary-header-badge span.text-muted,
+.diary-header-badge .text-muted {
+  color: rgba(255, 255, 255, 0.85) !important;
+  font-weight: 500;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.6);
 }

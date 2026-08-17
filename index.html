@@ -70,7 +70,7 @@
     <!-- Główny kontener widoków -->
     <main class="container my-2" style="max-width: 500px;">
       
-<!-- ========================================================================== -->
+      <!-- ========================================================================== -->
       <!-- 0. PULPIT GŁÓWNY (LANDING PAGE) -->
       <!-- ========================================================================== -->
       <section id="tab-dashboard" class="app-tab dashboard-container">
@@ -85,9 +85,9 @@
 
         <!-- Siatka Kafelków (8 Modułów w parach) -->
         <div class="row g-2 mt-1">
-          <!-- Rząd 1: Mapa (1) & Forum (2) -->
+          <!-- Rząd 1: Mapa & Forum -->
           <div class="col-6">
-            <div class="card dashboard-card shadow-sm h-100" onclick="switchTab('🗺️ Mapa')">
+            <div class="card dashboard-card shadow-sm h-100" onclick="switchTab('tab-map')">
               <div class="card-body text-center py-2 px-1">
                 <div class="fw-bold tile-title">Mapa</div>
                 <div class="tile-desc text-muted">Punkty i trasy</div>
@@ -95,7 +95,7 @@
             </div>
           </div>
           <div class="col-6">
-            <div class="card dashboard-card shadow-sm h-100 position-relative" onclick="switchTab('💬 Forum')">
+            <div class="card dashboard-card shadow-sm h-100 position-relative" onclick="switchTab('tab-forum')">
               <div class="card-body text-center py-2 px-1">
                 <div class="fw-bold tile-title">
                   Forum <span id="dashboardForumBadge" class="badge bg-danger rounded-pill ms-1" style="display: none; font-size: 0.65rem;">Nowe</span>
@@ -105,9 +105,9 @@
             </div>
           </div>
 
-          <!-- Rząd 2: Wydatki (3) & Zakupy (4) -->
+          <!-- Rząd 2: Wydatki & Zakupy -->
           <div class="col-6">
-            <div class="card dashboard-card shadow-sm h-100" onclick="switchTab('💰 Wydatki')">
+            <div class="card dashboard-card shadow-sm h-100" onclick="switchTab('tab-costs')">
               <div class="card-body text-center py-2 px-1">
                 <div class="fw-bold tile-title">Wydatki</div>
                 <div class="tile-desc text-muted">Wpisywanie kwot</div>
@@ -115,7 +115,7 @@
             </div>
           </div>
           <div class="col-6">
-            <div class="card dashboard-card shadow-sm h-100" onclick="switchTab('🛒 Zakupy')">
+            <div class="card dashboard-card shadow-sm h-100" onclick="switchTab('tab-shopping')">
               <div class="card-body text-center py-2 px-1">
                 <div class="fw-bold tile-title">Zakupy</div>
                 <div class="tile-desc text-muted">Wspólne listy</div>
@@ -123,9 +123,9 @@
             </div>
           </div>
 
-          <!-- Rząd 3: Kantor (5) & Portfel (6) -->
+          <!-- Rząd 3: Kantor & Portfel -->
           <div class="col-6">
-            <div class="card dashboard-card shadow-sm h-100" onclick="switchTab('💱 Kantor')">
+            <div class="card dashboard-card shadow-sm h-100" onclick="switchTab('tab-exchange')">
               <div class="card-body text-center py-2 px-1">
                 <div class="fw-bold tile-title">Kantor</div>
                 <div class="tile-desc text-muted">HUF / PLN / EUR</div>
@@ -133,7 +133,7 @@
             </div>
           </div>
           <div class="col-6">
-            <div class="card dashboard-card shadow-sm h-100" onclick="switchTab('🏦 Portfel')">
+            <div class="card dashboard-card shadow-sm h-100" onclick="switchTab('tab-wallet')">
               <div class="card-body text-center py-2 px-1">
                 <div class="fw-bold tile-title">Portfel</div>
                 <div class="tile-desc text-muted">Kto komu ile wisi</div>
@@ -141,9 +141,9 @@
             </div>
           </div>
 
-          <!-- Rząd 4: Razem za bilety (7) & Rozgrywki (8) -->
+          <!-- Rząd 4: Razem za bilety & Rozgrywki -->
           <div class="col-6">
-            <div class="card dashboard-card shadow-sm h-100" onclick="switchTab('📊 Razem za bilety')">
+            <div class="card dashboard-card shadow-sm h-100" onclick="switchTab('tab-calc')">
               <div class="card-body text-center py-2 px-1">
                 <div class="fw-bold tile-title">Razem za bilety</div>
                 <div class="tile-desc text-muted">Kalkulator biletów</div>
@@ -151,7 +151,7 @@
             </div>
           </div>
           <div class="col-6">
-            <div class="card dashboard-card shadow-sm h-100" onclick="switchTab('🎲 Rozgrywki')">
+            <div class="card dashboard-card shadow-sm h-100" onclick="switchTab('tab-games')">
               <div class="card-body text-center py-2 px-1">
                 <div class="fw-bold tile-title">Rozgrywki</div>
                 <div class="tile-desc text-muted">Gramy w gry</div>
@@ -159,20 +159,19 @@
             </div>
           </div>
         </div>
-        <!-- 5. WIERSZ: PAMIĘTNIKI Z WAKACJI (Z ZACHOWANIEM ODSTĘPÓW) -->
-          <div class="col-12 mt-2">
-            <div class="card py-2 px-3 text-center border shadow-sm rounded-4 stado-dashboard-card" 
-                 style="cursor: pointer;" 
-                 onclick="switchTab('tab-diary')">
-              <div class="fw-bold" style="color: var(--burgund); font-size: 1rem; line-height: 1.2;">Pamiętniki z wakacji</div>
-              <div class="text-muted small" style="font-size: 11px;">Zdjęcia, cytaty i dramy z wyjazdu</div>
-            </div>
-          </div>
 
+        <!-- 5. WIERSZ: PAMIĘTNIKI Z WAKACJI -->
+        <div class="col-12 mt-2">
+          <div class="card py-2 px-3 text-center border shadow-sm rounded-4 stado-dashboard-card" 
+               style="cursor: pointer;" 
+               onclick="switchTab('tab-diary')">
+            <div class="fw-bold" style="color: var(--burgund); font-size: 1rem; line-height: 1.2;">🌟 Pamiętniki z wakacji ☀️</div>
+            <div class="text-muted small" style="font-size: 11px;">Zdjęcia, cytaty i dramy z wyjazdu 🕶️</div>
+          </div>
+        </div>
       </section>
 
-
-<!-- ========================================================================== -->
+      <!-- ========================================================================== -->
       <!-- 1. MODUŁ: MAPA -->
       <!-- ========================================================================== -->
       <section id="tab-map" class="app-tab" style="display: none;">
@@ -259,7 +258,7 @@
         </div>
       </section>
 
-<!-- ========================================================================== -->
+      <!-- ========================================================================== -->
       <!-- 2. MODUŁ: FORUM DYSKUSYJNE -->
       <!-- ========================================================================== -->
       <section id="tab-forum" class="app-tab" style="display: none;">
@@ -283,8 +282,7 @@
               <input type="text" id="newTopicTitle" class="form-control form-control-sm mb-2" placeholder="Wpisz temat dyskusji...">
 
               <label class="small fw-bold text-muted mb-1">Treść pierwszej wiadomości:</label>
-              light rounded border">
-                <!-- Pasek formatowania w nowym wątku -->
+              <!-- Pasek formatowania w nowym wątku -->
               <div class="d-flex align-items-center gap-1 mb-2 p-1 bg-light rounded border">
                 <button type="button" class="btn btn-sm btn-outline-dark fw-bold px-2 py-0" onmousedown="event.preventDefault()" onclick="formatTopicDoc('bold')" title="Pogrubienie">B</button>
                 <button type="button" class="btn btn-sm btn-outline-dark fst-italic px-2 py-0" onmousedown="event.preventDefault()" onclick="formatTopicDoc('italic')" title="Kursywa">I</button>
@@ -333,7 +331,7 @@
           <div class="card p-3 border-0 shadow-sm rounded-4 mb-4">
             <h6 class="fw-bold mb-2" style="color: var(--burgund);">✍️ Napisz odpowiedź</h6>
             
-           <!-- Pasek formatowania w odpowiedzi -->
+            <!-- Pasek formatowania w odpowiedzi -->
             <div class="d-flex align-items-center gap-1 mb-2 p-1 bg-light rounded border">
               <button type="button" class="btn btn-sm btn-outline-dark fw-bold px-2 py-0" onmousedown="event.preventDefault()" onclick="formatReplyDoc('bold')" title="Pogrubienie">B</button>
               <button type="button" class="btn btn-sm btn-outline-dark fst-italic px-2 py-0" onmousedown="event.preventDefault()" onclick="formatReplyDoc('italic')" title="Kursywa">I</button>
@@ -346,14 +344,13 @@
             <div id="forumPostEditor" class="form-control mb-2 forum-editor-box" contenteditable="true" placeholder="Wpisz treść odpowiedzi..."></div>
             <button id="btnSendPost" class="btn btn-burgund btn-sm w-100 py-2">Opublikuj odpowiedź</button>
           </div>
-<!-- Dolny przycisk powrotu do wątków -->
+
+          <!-- Dolny przycisk powrotu do wątków -->
           <div class="text-center mb-4">
             <button class="btn btn-sm btn-outline-secondary w-100 py-2" onclick="showTopicsList()">
               <i class="bi bi-arrow-left"></i> Wróć do wątków
             </button>
           </div>
-        </div>
-
         </div>
       </section>
 
@@ -366,15 +363,18 @@
           <button class="btn btn-sm btn-outline-secondary" onclick="switchTab('dashboard')"><i class="bi bi-arrow-left"></i> Wróć</button>
         </div>
 
-        <!-- ZWIJANA KARTA: NOWY WYDATEK -->
+        <!-- ZWIJANA KARTA: NOWY WYDATEK / EDYCJA -->
         <div class="card p-3 border-0 shadow-sm rounded-4 mb-3">
           <div class="d-flex justify-content-between align-items-center" style="cursor: pointer;" onclick="toggleNewCostForm()">
-            <h6 class="fw-bold mb-0" style="color: var(--burgund);">➕ Nowy wydatek</h6>
+            <h6 class="fw-bold mb-0" id="costFormHeaderTitle" style="color: var(--burgund);">➕ Nowy wydatek</h6>
             <i id="iconNewCostToggle" class="bi bi-chevron-down text-muted fs-5"></i>
           </div>
 
           <div id="newCostFormCollapse" style="display: none;" class="mt-3 pt-2 border-top">
             <form id="formCost">
+              <!-- UKRYTE POLE NA ID EDYCJI -->
+              <input type="hidden" id="editingCostId" value="">
+
               <div class="mb-2">
                 <label class="small fw-bold text-muted">Za co:</label>
                 <input type="text" id="costName" class="form-control form-control-sm" required placeholder="np. Obiad w Dolinie Pięknej Pani">
@@ -439,7 +439,14 @@
                 <input type="text" id="costComment" class="form-control form-control-sm" placeholder="np. Płatność kartą">
               </div>
 
-              <button type="submit" class="btn btn-burgund btn-sm w-100 py-2">Zapisz wydatek</button>
+              <div class="d-flex gap-2">
+                <button type="submit" id="btnSubmitCost" class="btn btn-burgund btn-sm flex-fill py-2">
+                  Zapisz wydatek
+                </button>
+                <button type="button" id="btnCancelEditCost" class="btn btn-outline-secondary btn-sm py-2 px-3" style="display: none;" onclick="cancelCostEdit()">
+                  Anuluj
+                </button>
+              </div>
             </form>
           </div>
         </div>
@@ -740,9 +747,7 @@
         </div>
       </section>
 
-    
-
-<!-- ========================================================================== -->
+      <!-- ========================================================================== -->
       <!-- 9. MODUŁ: PAMIĘTNIKI Z WAKACJI -->
       <!-- ========================================================================== -->
       <section id="tab-diary" class="app-tab" style="display: none;">
@@ -803,9 +808,9 @@
         <div id="diaryEntriesContainer" class="mb-4"></div>
       </section>
 
-</main>
+    </main>
 
-<!-- Stopka -->
+    <!-- Stopka -->
     <footer class="footer-fixed d-flex justify-content-between align-items-center">
       <div>
         © JBP — <a href="https://github.com" target="_blank" rel="noopener noreferrer" class="fw-bold text-decoration-none" style="color:var(--burgund);">GitHub</a>
@@ -814,6 +819,7 @@
       </div>
       <div>🍇 <b>Egerszalók 2026</b></div>
     </footer>
+  </div>
 
   <!-- Biblioteki zewnętrzne -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

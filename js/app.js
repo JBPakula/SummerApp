@@ -57,11 +57,9 @@ async function initApp() {
   if (currentUser) {
     const navEntries = performance.getEntriesByType('navigation');
     const isReload = navEntries.length > 0 && navEntries[0].type === 'reload';
-    
-    // Tylko przy twardym odświeżeniu zachowujemy ostatnią zakładkę; przy nowym wejściu otwieramy Pulpit
     const tabToOpen = isReload ? (localStorage.getItem("active_tab") || "dashboard") : "dashboard";
     switchTab(tabToOpen);
-}
+  }
 }
 
 if (document.readyState === 'loading') {
@@ -273,7 +271,7 @@ function switchTab(tabId) {
   const tabs = document.querySelectorAll(".app-tab");
   tabs.forEach(t => t.style.display = "none");
 
-  const dash = document.getElementById("dashboardView") || document.getElementById("tab-dashboard");
+  const dash = document.getElementById("tab-dashboard") || document.getElementById("dashboardView");
 
   if (tabId === "dashboard" || tabId === "tab-dashboard") {
     if (dash) dash.style.display = "block";
@@ -283,14 +281,12 @@ function switchTab(tabId) {
 
   if (dash) dash.style.display = "none";
 
-  // Obsługa ID z prefiksem lub bez
   let targetEl = document.getElementById(tabId) || document.getElementById("tab-" + tabId.replace("tab-", ""));
 
   if (targetEl) {
     targetEl.style.display = "block";
     localStorage.setItem("active_tab", targetEl.id);
 
-    // Wywołania modułowe
     if (targetEl.id === "tab-diary" || tabId.includes("diary")) {
       loadDiary();
     } else if (targetEl.id === "tab-forum" || tabId.includes("forum")) {
@@ -301,12 +297,18 @@ function switchTab(tabId) {
       loadWallet();
     } else if (targetEl.id === "tab-map" || tabId.includes("map")) {
       loadMapData();
+    } else if (targetEl.id === "tab-shopping" || tabId.includes("shopping")) {
+      loadShoppingLists();
+    } else if (targetEl.id === "tab-games" || tabId.includes("games")) {
+      loadGames();
+    } else if (targetEl.id === "tab-exchange" || tabId.includes("exchange")) {
+      przeliczKantor();
     }
   }
 }
 
 // ==============================================================================
-// 1. MODUŁ: MAPA (KOMPAKTOWE 2 KOLUMNY, BIAŁY PRZYCISK, AUTO-KADROWANIE)
+// 1. MODUŁ: MAPA
 // ==============================================================================
 function getCategoryPinIcon(category, number) {
   let pinClass = 'pin-inne';
@@ -573,7 +575,6 @@ function renderMapList(points) {
     const isDom = (p.category || '').toLowerCase().includes('dom');
     const badgeNumber = isDom ? '🏠' : `#${idx + 1}`;
     
-    // Spis: wyłącznie odległość i adres (bez kategorii)
     const distText = isDom ? 'Baza noclegowa' : (p.distance_from_egerszalok != null ? `${p.distance_from_egerszalok} km od domu` : '');
     const addressText = p.address ? p.address : '';
     const subtitle = [distText, addressText].filter(Boolean).join(' &bull; ');
@@ -600,7 +601,6 @@ window.focusMapPoint = function(lat, lng) {
   if (!mapInstance) return;
   document.getElementById("mapContainer").scrollIntoView({ behavior: "smooth", block: "start" });
   
-  // Przesunięcie środka o 0.005 stopnia na północ od dolnej krawędzi, by dymek idealnie wszedł w kadr
   const offsetLat = lat + 0.0045;
   mapInstance.flyTo([offsetLat, lng], 15, { duration: 0.8 });
 
@@ -793,8 +793,9 @@ async function sendAndFetchRadarLocations() {
     { enableHighAccuracy: true, timeout: 8000 }
   );
 }
+
 // ==============================================================================
-// 2. MODUŁ: FORUM DYSKUSYJNE (POPRAWIONE FORMATOWANIE, WZMIANKI, LAJKI I POWIADOMIENIA)
+// 2. MODUŁ: FORUM DYSKUSYJNE
 // ==============================================================================
 function renderAvatarHtml(login) {
   if (!login) return `<span class="forum-avatar-placeholder me-2">👤</span>`;
@@ -834,7 +835,6 @@ async function pobierzUzytkownikowForum() {
   }
 }
 
-// 1. Podświetlanie @Wzmianek na żywo w edytorze (Bordowy pogrubiony tekst)
 function attachMentionHighlighter(editorId) {
   const editor = document.getElementById(editorId);
   if (!editor) return;
@@ -902,12 +902,10 @@ async function subscribeMentionedUsers(rawHtml, topicId) {
   }
 }
 
-// 2. Niezawodne sprawdzanie powiadomień (dla Pulpitu)
 async function checkForumUnreadNotifications() {
   if (!currentUserId) return;
 
   try {
-    // Pobierz wszystkie aktywne wątki
     const { data: topics } = await supabaseClient
       .from("forum_topics")
       .select("id, created_at, created_by")
@@ -919,14 +917,12 @@ async function checkForumUnreadNotifications() {
       return;
     }
 
-    // Pobierz posty innych użytkowników
     const { data: posts } = await supabaseClient
       .from("forum")
       .select("topic_id, created_at, created_by")
       .neq("created_by", currentUserId)
       .eq("deleted", false);
 
-    // Pobierz ustawienia subskrypcji zalogowanego użytkownika
     const { data: subs } = await supabaseClient
       .from("forum_subscriptions")
       .select("topic_id, is_subscribed, last_read_at")
@@ -939,15 +935,11 @@ async function checkForumUnreadNotifications() {
 
     topics.forEach(t => {
       const sub = subMap[t.id];
-      const isSubbed = sub ? sub.is_subscribed : true; // Domyślnie subskrybowany
+      const isSubbed = sub ? sub.is_subscribed : true;
       if (!isSubbed) return;
 
       const lastRead = sub?.last_read_at ? new Date(sub.last_read_at).getTime() : 0;
-
-      // Sprawdź czy sam wątek jest nowy
       const isNewTopic = (t.created_by != currentUserId && new Date(t.created_at).getTime() > (lastRead + 1000));
-
-      // Sprawdź czy są nowe komentarze w wątku
       const hasNewPosts = posts ? posts.some(p => p.topic_id === t.id && new Date(p.created_at).getTime() > (lastRead + 1000)) : false;
 
       if (isNewTopic || hasNewPosts) {
@@ -1100,7 +1092,6 @@ function renderSingleTopicItem(t, allPosts, subData, isArchived) {
   const diffSec = (new Date() - dateObj) / 1000;
   const isAuthor = (t.created_by == currentUserId || (currentUser && author.toLowerCase() === currentUser.toLowerCase()));
 
-  // Sprawdzanie czy są nowe wpisy dla zalogowanego użytkownika
   const isSubscribed = subData ? subData.is_subscribed : true;
   const lastRead = subData?.last_read_at ? new Date(subData.last_read_at).getTime() : 0;
   
@@ -1212,7 +1203,6 @@ async function openTopicById(topicId) {
 
   await pobierzUzytkownikowForum();
 
-  // 1. Sprawdzamy, czy użytkownik ma już wpis subskrypcji dla tego wątku
   if (currentUserId) {
     const { data: existingSub } = await supabaseClient
       .from("forum_subscriptions")
@@ -1222,12 +1212,10 @@ async function openTopicById(topicId) {
       .maybeSingle();
 
     if (existingSub) {
-      // Jeśli rekord istnieje (np. wyciszony lub subskrybowany) -> aktualizujemy TYLKO czas przeczytania, nie ruszając is_subscribed
       await supabaseClient.from("forum_subscriptions").update({
         last_read_at: new Date().toISOString()
       }).eq("id", existingSub.id);
     } else {
-      // Jeśli rekordu brak -> tworzymy go z is_subscribed = false (samo wejście NIE włącza dzwoneczka)
       await supabaseClient.from("forum_subscriptions").insert({
         topic_id: currentTopicId,
         user_id: currentUserId,
@@ -1302,7 +1290,6 @@ async function setupSubscriptionBell(topicId) {
     .eq("user_id", currentUserId)
     .maybeSingle();
 
-  // Domyślnie dzwoneczek jest wyłączony, chyba że jest w bazie is_subscribed = true (autor / post / wzmianka)
   let isSubbed = sub ? sub.is_subscribed : false;
   renderBellIcon(isSubbed);
 
@@ -1416,7 +1403,6 @@ async function loadPosts(topicId) {
   }).join("");
 }
 
-// 3. Płynne polubienie bez przewijania ekranu
 window.toggleLike = async function(postId, btnElement) {
   if (!currentUserId || !btnElement) return;
 
@@ -1500,7 +1486,7 @@ window.deletePost = async function(postId) {
 };
 
 // ==============================================================================
-// 3. MODUŁ: WYDATKI (ZWIJANE DATY, ARCHIWUM, PRZELICZENIA PLN)
+// 3. MODUŁ: WYDATKI (ZWIJANE DATY, ARCHIWUM, PRZELICZENIA PLN ORAZ PEŁNA EDYCJA)
 // ==============================================================================
 window.toggleNewCostForm = function() {
   const box = document.getElementById("newCostFormCollapse");
@@ -1529,7 +1515,6 @@ window.toggleCostDateGroup = function(dateKey) {
   if (icon) icon.className = isHidden ? "bi bi-chevron-up text-muted" : "bi bi-chevron-down text-muted";
 };
 
-// Funkcja pomocnicza: generuje główną kwotę oraz szare przeliczenie (~X.XX PLN) pod spodem
 function renderCostAmountWithPln(amount, currency) {
   const num = parseFloat(amount) || 0;
   const formattedMain = num.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -1577,11 +1562,9 @@ async function loadCosts() {
 
   setupBorrowerSelectionUI();
 
-  // Bezpieczne rozdzielenie na aktywne i archiwalne
   const activeCosts = data.filter(c => c.is_archived !== true);
   const archivedCosts = data.filter(c => c.is_archived === true);
 
-  // 1. Renderowanie aktywnych wydatków z podziałem na daty
   const grouped = {};
   activeCosts.forEach(c => {
     if (c.is_private) {
@@ -1622,7 +1605,6 @@ async function loadCosts() {
     });
   }
 
-  // 2. Renderowanie zarchiwizowanych wydatków
   if (archivedContainer) {
     if (archivedCosts.length === 0) {
       archivedContainer.innerHTML = `<div class="text-muted small p-2">Brak zarchiwizowanych wydatków.</div>`;
@@ -1639,25 +1621,37 @@ function renderSingleCostCard(c, nowTime, isArchived) {
 
   let actionsHtml = "";
   if (isAuthor) {
+    let editBtn = "";
+    if (!isArchived) {
+      editBtn = `
+        <button class="btn btn-sm btn-outline-secondary py-0 px-2 mt-2 me-1" style="font-size: 11px;" title="Edytuj wydatek" onclick="startEditCost(${c.id})">
+          ✏️ Edytuj
+        </button>
+      `;
+    }
+
+    let mainActionBtn = "";
     if (diffSec <= 60 && !isArchived) {
-      actionsHtml = `
+      mainActionBtn = `
         <button class="btn btn-sm btn-outline-danger py-0 px-2 mt-2" style="font-size: 11px;" onclick="window.usunWydatek(${c.id})">
           🗑️ Usuń (${Math.max(0, Math.round(60 - diffSec))}s)
         </button>
       `;
     } else if (!isArchived) {
-      actionsHtml = `
+      mainActionBtn = `
         <button class="btn btn-sm btn-outline-secondary py-0 px-2 mt-2" style="font-size: 11px;" onclick="window.archiveWydatek(${c.id}, true)">
           📦 Archiwizuj
         </button>
       `;
     } else {
-      actionsHtml = `
+      mainActionBtn = `
         <button class="btn btn-sm btn-outline-success py-0 px-2 mt-2" style="font-size: 11px;" onclick="window.archiveWydatek(${c.id}, false)">
           🔄 Przywróć
         </button>
       `;
     }
+
+    actionsHtml = editBtn + mainActionBtn;
   }
 
   return `
@@ -1712,6 +1706,126 @@ function setupBorrowerSelectionUI() {
   });
 }
 
+// ------------------------------------------------------------------------------
+// EDYCJA WYDATKÓW W FORMULARZU
+// ------------------------------------------------------------------------------
+window.startEditCost = async function(costId) {
+  try {
+    const { data: cost, error } = await supabaseClient
+      .from("costs")
+      .select("*")
+      .eq("id", Number(costId))
+      .single();
+
+    if (error || !cost) {
+      alert("Nie udało się pobrać danych wydatku do edycji.");
+      return;
+    }
+
+    // 1. Rozwiń formularz jeśli jest zwinięty
+    const box = document.getElementById("newCostFormCollapse");
+    const icon = document.getElementById("iconNewCostToggle");
+    if (box && box.style.display === "none") {
+      box.style.display = "block";
+      if (icon) icon.className = "bi bi-chevron-up text-muted fs-5";
+    }
+
+    // 2. Wypełnij pola
+    document.getElementById("editingCostId").value = cost.id;
+    if (document.getElementById("costName")) document.getElementById("costName").value = cost.cost_name || "";
+    if (document.getElementById("costAmount")) document.getElementById("costAmount").value = cost.amount || "";
+    if (document.getElementById("costCurrency")) document.getElementById("costCurrency").value = cost.currency || "HUF";
+    if (document.getElementById("costComment")) document.getElementById("costComment").value = cost.comment || "";
+    
+    const isPriv = cost.is_private || false;
+    const privCb = document.getElementById("costIsPrivate");
+    if (privCb) {
+      privCb.checked = isPriv;
+      const bWrapper = document.getElementById("costBorrowerWrapper");
+      if (bWrapper) bWrapper.style.display = isPriv ? "none" : "block";
+    }
+
+    // Odznaczenie checkboxów
+    document.querySelectorAll(".team-cb, .user-cb").forEach(cb => cb.checked = false);
+
+    const b = cost.borrower || "Całe Stado";
+    const rAll = document.getElementById("bModeAll");
+    const rTeams = document.getElementById("bModeTeams");
+    const rUsers = document.getElementById("bModeUsers");
+    const boxTeams = document.getElementById("boxBorrowerTeams");
+    const boxUsers = document.getElementById("boxBorrowerUsers");
+
+    if (b === "Całe Stado" || isPriv) {
+      if (rAll) rAll.checked = true;
+      if (boxTeams) boxTeams.style.display = "none";
+      if (boxUsers) boxUsers.style.display = "none";
+    } else {
+      const parts = b.split(",").map(s => s.trim());
+      const isTeams = parts.some(p => ["Bobry", "Pakuły", "Robaki", "Sileziny"].includes(p));
+      
+      if (isTeams) {
+        if (rTeams) rTeams.checked = true;
+        if (boxTeams) boxTeams.style.display = "block";
+        if (boxUsers) boxUsers.style.display = "none";
+        document.querySelectorAll(".team-cb").forEach(cb => {
+          if (parts.includes(cb.value)) cb.checked = true;
+        });
+      } else {
+        if (rUsers) rUsers.checked = true;
+        if (boxTeams) boxTeams.style.display = "none";
+        if (boxUsers) boxUsers.style.display = "block";
+        document.querySelectorAll(".user-cb").forEach(cb => {
+          if (parts.includes(cb.value)) cb.checked = true;
+        });
+      }
+    }
+
+    // 3. Dostosuj przyciski i nagłówek
+    const headerTitle = document.getElementById("costFormHeaderTitle");
+    const btnSubmit = document.getElementById("btnSubmitCost");
+    const btnCancel = document.getElementById("btnCancelEditCost");
+
+    if (headerTitle) headerTitle.innerText = "✏️ Edycja wydatku";
+    if (btnSubmit) {
+      btnSubmit.innerText = "Zaktualizuj wydatek";
+      btnSubmit.className = "btn btn-burgund btn-sm flex-fill py-2";
+    }
+    if (btnCancel) btnCancel.style.display = "block";
+
+    // 4. Przewiń ekran do formularza
+    document.getElementById("tab-costs").scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  } catch (err) {
+    console.error("Błąd edycji wydatku:", err);
+  }
+};
+
+window.cancelCostEdit = function() {
+  const form = document.getElementById("formCost");
+  if (form) form.reset();
+
+  const hiddenId = document.getElementById("editingCostId");
+  if (hiddenId) hiddenId.value = "";
+
+  const headerTitle = document.getElementById("costFormHeaderTitle");
+  const btnSubmit = document.getElementById("btnSubmitCost");
+  const btnCancel = document.getElementById("btnCancelEditCost");
+
+  if (headerTitle) headerTitle.innerText = "➕ Nowy wydatek";
+  if (btnSubmit) btnSubmit.innerText = "Zapisz wydatek";
+  if (btnCancel) btnCancel.style.display = "none";
+
+  document.querySelectorAll(".team-cb, .user-cb").forEach(cb => cb.checked = false);
+  const rAll = document.getElementById("bModeAll");
+  if (rAll) rAll.checked = true;
+  const boxTeams = document.getElementById("boxBorrowerTeams");
+  const boxUsers = document.getElementById("boxBorrowerUsers");
+  const bWrapper = document.getElementById("costBorrowerWrapper");
+  if (boxTeams) boxTeams.style.display = "none";
+  if (boxUsers) boxUsers.style.display = "none";
+  if (bWrapper) bWrapper.style.display = "block";
+};
+
 window.usunWydatek = async function(costId) {
   if (!confirm("Czy na pewno chcesz trwale usunąć ten wydatek?")) return;
   await supabaseClient.from("costs").update({ deleted: true }).eq("id", costId);
@@ -1731,6 +1845,9 @@ const formCost = document.getElementById("formCost");
 if (formCost) {
   formCost.onsubmit = async (e) => {
     e.preventDefault();
+    const btnSubmit = document.getElementById("btnSubmitCost");
+    const editingId = document.getElementById("editingCostId") ? document.getElementById("editingCostId").value : "";
+
     const name = document.getElementById("costName").value.trim();
     const amount = parseFloat(document.getElementById("costAmount").value);
     const currency = document.getElementById("costCurrency").value;
@@ -1739,7 +1856,8 @@ if (formCost) {
 
     let borrower = "Całe Stado";
     if (!isPrivate) {
-      const mode = document.querySelector("input[name='borrowerMode']:checked").value;
+      const modeEl = document.querySelector("input[name='borrowerMode']:checked");
+      const mode = modeEl ? modeEl.value : "all";
       if (mode === "teams") {
         const selTeams = Array.from(document.querySelectorAll(".team-cb:checked")).map(cb => cb.value);
         if (selTeams.length === 0) {
@@ -1759,29 +1877,55 @@ if (formCost) {
 
     if (!name || isNaN(amount) || amount <= 0) return;
 
-    await supabaseClient.from("costs").insert({
-      created_by: currentUserId,
-      paid_by: currentUser,
-      amount: amount,
-      currency: currency,
-      cost_name: name,
-      borrower: isPrivate ? "Tylko dla mnie" : borrower,
-      comment: comment,
-      is_private: isPrivate,
-      is_archived: false,
-      settled_by: []
-    });
+    btnSubmit.disabled = true;
+    btnSubmit.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Zapisuję...`;
 
-    formCost.reset();
-    document.querySelectorAll(".team-cb, .user-cb").forEach(cb => cb.checked = false);
-    document.getElementById("bModeAll").checked = true;
-    document.getElementById("boxBorrowerTeams").style.display = "none";
-    document.getElementById("boxBorrowerUsers").style.display = "none";
-    document.getElementById("costBorrowerWrapper").style.display = "block";
+    let resError = null;
 
-    toggleNewCostForm();
-    loadCosts();
-    loadWallet();
+    if (editingId) {
+      // AKTUALIZACJA
+      const { error } = await supabaseClient
+        .from("costs")
+        .update({
+          cost_name: name,
+          amount: amount,
+          currency: currency,
+          borrower: isPrivate ? "Tylko dla mnie" : borrower,
+          comment: comment || null,
+          is_private: isPrivate
+        })
+        .eq("id", Number(editingId));
+      resError = error;
+    } else {
+      // NOWY WYDATEK
+      const { error } = await supabaseClient
+        .from("costs")
+        .insert({
+          created_by: currentUserId,
+          paid_by: currentUser,
+          amount: amount,
+          currency: currency,
+          cost_name: name,
+          borrower: isPrivate ? "Tylko dla mnie" : borrower,
+          comment: comment || null,
+          is_private: isPrivate,
+          is_archived: false,
+          settled_by: []
+        });
+      resError = error;
+    }
+
+    btnSubmit.disabled = false;
+
+    if (resError) {
+      alert("Błąd zapisu wydatku: " + resError.message);
+      btnSubmit.innerText = editingId ? "Zaktualizuj wydatek" : "Zapisz wydatek";
+    } else {
+      cancelCostEdit();
+      toggleNewCostForm();
+      loadCosts();
+      loadWallet();
+    }
   };
 }
 
@@ -2086,7 +2230,7 @@ function renderCheatsheet(from, to, rate) {
 }
 
 // ==============================================================================
-// 6. MODUŁ: PORTFEL (Z PRZELICZENIAMI PLN I DZIAŁAJĄCYM OZNACZANIEM SPŁAT)
+// 6. MODUŁ: PORTFEL
 // ==============================================================================
 function formatWalletSubPln(kwota, wal) {
   if (wal === "PLN") return "";
@@ -2245,7 +2389,6 @@ async function loadWallet() {
   summaryEl.style.color = razemHuf >= 0 ? "green" : "red";
 }
 
-// Obsługa kliknięcia przycisku Rozliczono / Do rozliczenia
 window.oznaczRozliczenie = async function(costId, entityKey, markAsSettled) {
   try {
     const { data, error } = await supabaseClient
@@ -2627,6 +2770,7 @@ async function loadPastGames() {
     container.innerHTML = "<div class='text-muted small'>Brak zakończonych rozgrywek.</div>";
   }
 }
+
 // ==============================================================================
 // 9. MODUŁ: PAMIĘTNIKI Z WAKACJI
 // ==============================================================================
@@ -2720,7 +2864,6 @@ async function loadDiary() {
   container.innerHTML = "<div class='text-muted small py-2 text-center'>Ładowanie kroniki Stada...</div>";
 
   try {
-    // 1. Pobranie danych o osobach (wiek + opisy) z tabeli users
     const { data: dbUsers, error: usersErr } = await supabaseClient
       .from("users")
       .select("id, login, age, descriptions");
@@ -2740,7 +2883,6 @@ async function loadDiary() {
       renderDiaryFilterBadges(dbUsers);
     }
 
-    // 2. Pobranie aktywnych wpisów z kroniki
     const { data: entries, error } = await supabaseClient
       .from("diary_entries")
       .select("*")
@@ -2757,7 +2899,6 @@ async function loadDiary() {
       return;
     }
 
-    // 3. Połączenie wpisów z danymi użytkownika i rotacją opisów
     const authorCounters = {};
     const entriesWithDescriptions = entries.map(entry => {
       const authorKey = (entry.author_login || '').trim().toLowerCase();
@@ -2776,15 +2917,12 @@ async function loadDiary() {
       };
     });
 
-    // Najnowsze wpisy na samej górze
     const sortedEntries = entriesWithDescriptions.reverse();
 
-    // Filtrowanie wybranego autora
     const filtered = diaryActiveAuthorFilter === 'all'
       ? sortedEntries
       : sortedEntries.filter(e => (e.author_login || '').trim().toLowerCase() === diaryActiveAuthorFilter.trim().toLowerCase());
 
-    // Grupowanie wpisów po trip_date
     const groupedByDate = {};
     filtered.forEach(e => {
       const dateKey = e.trip_date || (e.created_at ? e.created_at.substring(0, 10) : 'Wyprawa');
@@ -2829,7 +2967,6 @@ function renderSingleDiaryCard(entry, nowTime) {
   const author = entry.author_login || "Uczestnik";
   const avatar = renderAvatarHtml(author);
   
-  // Formatowanie wieku: (35 l.) lub (doświadczony)
   let ageFormatted = '';
   if (entry.userAge) {
     const rawAge = String(entry.userAge).trim();
