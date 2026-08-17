@@ -55,9 +55,13 @@ async function initApp() {
   attachMentionHighlighter("forumPostEditor");
 
   if (currentUser) {
-    const lastTab = localStorage.getItem("active_tab") || "dashboard";
-    switchTab(lastTab);
-  }
+    const navEntries = performance.getEntriesByType('navigation');
+    const isReload = navEntries.length > 0 && navEntries[0].type === 'reload';
+    
+    // Tylko przy twardym odświeżeniu zachowujemy ostatnią zakładkę; przy nowym wejściu otwieramy Pulpit
+    const tabToOpen = isReload ? (localStorage.getItem("active_tab") || "dashboard") : "dashboard";
+    switchTab(tabToOpen);
+}
 }
 
 if (document.readyState === 'loading') {
@@ -182,7 +186,9 @@ async function verifyAndLogin(userName, password) {
     initMap();
     loadCosts();
 
-    const savedTab = localStorage.getItem("active_tab") || "dashboard";
+    const navEntries = performance.getEntriesByType('navigation');
+    const isReload = navEntries.length > 0 && navEntries[0].type === 'reload';
+    const savedTab = isReload ? (localStorage.getItem("active_tab") || "dashboard") : "dashboard";
     switchTab(savedTab);
     return true;
   } catch (e) {
@@ -1495,12 +1501,68 @@ window.deletePost = async function(postId) {
 };
 
 // ==============================================================================
-// 3. MODUŁ: WYDATKI
+// 3. MODUŁ: WYDATKI (ZWIJANE DATY, ARCHIWUM, PRZELICZENIA PLN)
 // ==============================================================================
+window.toggleNewCostForm = function() {
+  const box = document.getElementById("newCostFormCollapse");
+  const icon = document.getElementById("iconNewCostToggle");
+  if (!box) return;
+  const isHidden = box.style.display === "none";
+  box.style.display = isHidden ? "block" : "none";
+  if (icon) icon.className = isHidden ? "bi bi-chevron-up text-muted fs-5" : "bi bi-chevron-down text-muted fs-5";
+};
+
+window.toggleArchivedCosts = function() {
+  const box = document.getElementById("archivedCostsList");
+  const icon = document.getElementById("iconArchivedCostsToggle");
+  if (!box) return;
+  const isHidden = box.style.display === "none";
+  box.style.display = isHidden ? "block" : "none";
+  if (icon) icon.className = isHidden ? "bi bi-chevron-up text-muted" : "bi bi-chevron-down text-muted";
+};
+
+window.toggleCostDateGroup = function(dateKey) {
+  const box = document.getElementById(`cost-group-${dateKey}`);
+  const icon = document.getElementById(`cost-icon-${dateKey}`);
+  if (!box) return;
+  const isHidden = box.style.display === "none";
+  box.style.display = isHidden ? "block" : "none";
+  if (icon) icon.className = isHidden ? "bi bi-chevron-up text-muted" : "bi bi-chevron-down text-muted";
+};
+
+// Funkcja pomocnicza: generuje główną kwotę oraz szare przeliczenie (~X.XX PLN) pod spodem
+function renderCostAmountWithPln(amount, currency) {
+  const num = parseFloat(amount) || 0;
+  const formattedMain = num.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  if (currency === "PLN") {
+    return `<div class="fw-bold fs-6 text-end" style="color:var(--burgund);">${formattedMain} PLN</div>`;
+  }
+
+  let rateToPln = 1.0;
+  if (currency === "HUF") {
+    rateToPln = bazaKursow["HUF_PLN"] || 0.0117;
+  } else if (currency === "EUR") {
+    rateToPln = bazaKursow["EUR_PLN"] || 4.32;
+  }
+
+  const inPln = (num * rateToPln).toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  return `
+    <div class="text-end">
+      <div class="fw-bold fs-6" style="color:var(--burgund); line-height: 1.1;">${formattedMain} ${currency}</div>
+      <div class="text-muted" style="font-size: 0.72rem; font-weight: 400; margin-top: 2px;">(~${inPln} PLN)</div>
+    </div>
+  `;
+}
+
 async function loadCosts() {
   const container = document.getElementById("costsList");
+  const archivedContainer = document.getElementById("archivedCostsList");
   if (!container) return;
-  container.innerHTML = "";
+
+  container.innerHTML = "<div class='text-muted small py-2'>Ładowanie wydatków...</div>";
+  if (archivedContainer) archivedContainer.innerHTML = "";
 
   const { data } = await supabaseClient
     .from("costs")
@@ -1510,59 +1572,110 @@ async function loadCosts() {
 
   if (!data || data.length === 0) {
     container.innerHTML = `<div class="text-center text-muted small p-3">Brak zarejestrowanych wydatków.</div>`;
+    if (archivedContainer) archivedContainer.innerHTML = `<div class="text-muted small p-2">Brak zarchiwizowanych wydatków.</div>`;
     return;
   }
 
   setupBorrowerSelectionUI();
 
+  // Bezpieczne rozdzielenie na aktywne i archiwalne
+  const activeCosts = data.filter(c => c.is_archived !== true);
+  const archivedCosts = data.filter(c => c.is_archived === true);
+
+  // 1. Renderowanie aktywnych wydatków z podziałem na daty
   const grouped = {};
-  data.forEach(c => {
+  activeCosts.forEach(c => {
     if (c.is_private) {
       const allowedUsers = [c.paid_by, malzenstwaMapa[c.paid_by]];
       if (!allowedUsers.includes(currentUser)) return;
     }
-
     const dateKey = c.created_at.substring(0, 10);
     if (!grouped[dateKey]) grouped[dateKey] = [];
     grouped[dateKey].push(c);
   });
 
-  const now = new Date().getTime();
+  const todayStr = new Date().toISOString().substring(0, 10);
+  const nowTime = new Date().getTime();
+  container.innerHTML = "";
 
-  Object.entries(grouped).forEach(([dateStr, items]) => {
-    const header = document.createElement("div");
-    header.className = "cost-date-header";
-    header.innerText = `📅 ${dateStr}`;
-    container.appendChild(header);
+  const dateKeys = Object.keys(grouped);
+  if (dateKeys.length === 0) {
+    container.innerHTML = `<div class="text-center text-muted small p-3">Brak aktywnych wydatków.</div>`;
+  } else {
+    dateKeys.forEach((dateStr, idx) => {
+      const isCurrentDay = (dateStr === todayStr) || (idx === 0 && !dateKeys.includes(todayStr));
+      const items = grouped[dateStr];
 
-    items.forEach(c => {
-      const card = document.createElement("div");
-      card.className = c.is_private ? "stado-card-private" : "stado-card";
+      const section = document.createElement("div");
+      section.className = "mb-2";
 
-      const diffSec = (now - new Date(c.created_at).getTime()) / 1000;
-      const isUnderOneMinute = diffSec <= 60;
-      const isAuthor = (c.created_by == currentUserId || (currentUser && c.paid_by && c.paid_by.toLowerCase() === currentUser.toLowerCase()));
-      const canDelete = isUnderOneMinute && isAuthor;
-      const remainingSec = Math.max(0, Math.round(60 - diffSec));
-
-      card.innerHTML = `
-        <div class="d-flex justify-content-between align-items-start">
-          <div class="fw-bold">${c.is_private ? '🔒 [Prywatny] ' : ''}${c.cost_name}</div>
-          <div class="fw-bold fs-6" style="color:var(--burgund);">${Number(c.amount).toLocaleString('pl-PL', { minimumFractionDigits: 2 })} ${c.currency}</div>
+      section.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center p-2 bg-light rounded-3 border mb-1" 
+             style="cursor: pointer;" onclick="toggleCostDateGroup('${dateStr}')">
+          <span class="fw-bold small text-dark"><i class="bi bi-calendar-event me-1"></i> ${dateStr} (${items.length})</span>
+          <i id="cost-icon-${dateStr}" class="bi ${isCurrentDay ? 'bi-chevron-up' : 'bi-chevron-down'} text-muted"></i>
         </div>
-        <div class="small text-muted mt-1">
-          Płacił(a): <b>${c.paid_by}</b> ${c.is_private ? '' : `➔ Dla: <b>${c.borrower}</b>`}
+        <div id="cost-group-${dateStr}" style="display: ${isCurrentDay ? 'block' : 'none'};">
+          ${items.map(c => renderSingleCostCard(c, nowTime, false)).join("")}
         </div>
-        ${c.comment ? `<div class="small fst-italic text-secondary mt-1">${c.comment}</div>` : ''}
-        ${canDelete ? `
-          <div class="text-end mt-2">
-            <button class="cost-delete-btn" onclick="window.usunWydatek(${c.id})">🗑️ Usuń (${remainingSec}s)</button>
-          </div>
-        ` : ''}
       `;
-      container.appendChild(card);
+      container.appendChild(section);
     });
-  });
+  }
+
+  // 2. Renderowanie zarchiwizowanych wydatków
+  if (archivedContainer) {
+    if (archivedCosts.length === 0) {
+      archivedContainer.innerHTML = `<div class="text-muted small p-2">Brak zarchiwizowanych wydatków.</div>`;
+    } else {
+      archivedContainer.innerHTML = archivedCosts.map(c => renderSingleCostCard(c, nowTime, true)).join("");
+    }
+  }
+}
+
+function renderSingleCostCard(c, nowTime, isArchived) {
+  const diffSec = (nowTime - new Date(c.created_at).getTime()) / 1000;
+  const isAuthor = (c.created_by == currentUserId || (currentUser && c.paid_by && c.paid_by.toLowerCase() === currentUser.toLowerCase()));
+  const amountHtml = renderCostAmountWithPln(c.amount, c.currency);
+
+  let actionsHtml = "";
+  if (isAuthor) {
+    if (diffSec <= 60 && !isArchived) {
+      actionsHtml = `
+        <button class="btn btn-sm btn-outline-danger py-0 px-2 mt-2" style="font-size: 11px;" onclick="window.usunWydatek(${c.id})">
+          🗑️ Usuń (${Math.max(0, Math.round(60 - diffSec))}s)
+        </button>
+      `;
+    } else if (!isArchived) {
+      actionsHtml = `
+        <button class="btn btn-sm btn-outline-secondary py-0 px-2 mt-2" style="font-size: 11px;" onclick="window.archiveWydatek(${c.id}, true)">
+          📦 Archiwizuj
+        </button>
+      `;
+    } else {
+      actionsHtml = `
+        <button class="btn btn-sm btn-outline-success py-0 px-2 mt-2" style="font-size: 11px;" onclick="window.archiveWydatek(${c.id}, false)">
+          🔄 Przywróć
+        </button>
+      `;
+    }
+  }
+
+  return `
+    <div class="${c.is_private ? 'stado-card-private' : 'stado-card'} ${isArchived ? 'opacity-75 bg-light' : ''} mb-2">
+      <div class="d-flex justify-content-between align-items-start">
+        <div class="pe-2">
+          <div class="fw-bold">${c.is_private ? '🔒 [Prywatny] ' : ''}${c.cost_name}</div>
+          <div class="small text-muted mt-1">
+            Płacił(a): <b>${c.paid_by}</b> ${c.is_private ? '' : `➔ Dla: <b>${c.borrower}</b>`}
+          </div>
+          ${c.comment ? `<div class="small fst-italic text-secondary mt-1">${c.comment}</div>` : ''}
+        </div>
+        ${amountHtml}
+      </div>
+      ${actionsHtml ? `<div class="text-end border-top pt-1 mt-2">${actionsHtml}</div>` : ''}
+    </div>
+  `;
 }
 
 function setupBorrowerSelectionUI() {
@@ -1601,8 +1714,16 @@ function setupBorrowerSelectionUI() {
 }
 
 window.usunWydatek = async function(costId) {
-  if (!confirm("Czy na pewno chcesz usunąć ten wydatek?")) return;
+  if (!confirm("Czy na pewno chcesz trwale usunąć ten wydatek?")) return;
   await supabaseClient.from("costs").update({ deleted: true }).eq("id", costId);
+  loadCosts();
+  loadWallet();
+};
+
+window.archiveWydatek = async function(costId, archive) {
+  const actionText = archive ? "zarchiwizować" : "przywrócić z archiwum";
+  if (!confirm(`Czy na pewno chcesz ${actionText} ten wydatek?`)) return;
+  await supabaseClient.from("costs").update({ is_archived: archive }).eq("id", costId);
   loadCosts();
   loadWallet();
 };
@@ -1648,6 +1769,7 @@ if (formCost) {
       borrower: isPrivate ? "Tylko dla mnie" : borrower,
       comment: comment,
       is_private: isPrivate,
+      is_archived: false,
       settled_by: []
     });
 
@@ -1658,6 +1780,7 @@ if (formCost) {
     document.getElementById("boxBorrowerUsers").style.display = "none";
     document.getElementById("costBorrowerWrapper").style.display = "block";
 
+    toggleNewCostForm();
     loadCosts();
     loadWallet();
   };
@@ -1964,8 +2087,18 @@ function renderCheatsheet(from, to, rate) {
 }
 
 // ==============================================================================
-// 6. MODUŁ: PORTFEL
+// 6. MODUŁ: PORTFEL (Z PRZELICZENIAMI PLN I DZIAŁAJĄCYM OZNACZANIEM SPŁAT)
 // ==============================================================================
+function formatWalletSubPln(kwota, wal) {
+  if (wal === "PLN") return "";
+  let rateToPln = 1.0;
+  if (wal === "HUF") rateToPln = bazaKursow["HUF_PLN"] || 0.0117;
+  else if (wal === "EUR") rateToPln = bazaKursow["EUR_PLN"] || 4.32;
+
+  const inPln = (kwota * rateToPln).toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return `<span class="text-muted fw-normal ms-1" style="font-size: 0.72rem;">(~${inPln} PLN)</span>`;
+}
+
 async function loadWallet() {
   const { data: listaW } = await supabaseClient
     .from("costs")
@@ -1987,8 +2120,10 @@ async function loadWallet() {
   const ktosZalega = [];
   const ALL_TEAMS = ["Bobry", "Pakuły", "Robaki", "Sileziny"];
 
-  if (listaW) {
-    listaW.forEach(w => {
+  const aktywneKoszty = listaW ? listaW.filter(w => w.is_archived !== true) : [];
+
+  if (aktywneKoszty.length > 0) {
+    aktywneKoszty.forEach(w => {
       const kwota = parseFloat(w.amount);
       const wal = w.currency;
       const ktoPlacil = w.paid_by;
@@ -2000,6 +2135,7 @@ async function loadWallet() {
       if (dlaKogoStr === "Całe Stado") {
         const kwotaUlamka = kwota / 4.0;
         const wartoscHuf = kwotaUlamka * kursDoHuf;
+        const subPln = formatWalletSubPln(kwotaUlamka, wal);
 
         if (teamPlacacy !== currentTeam) {
           const czyRozliczone = settledArray.includes(currentTeam);
@@ -2009,7 +2145,10 @@ async function loadWallet() {
             <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
               <div>
                 <span class="wallet-badge-fraction">1/4</span> Dla: <b>${ktoPlacil} (${teamPlacacy})</b> za <i>${w.cost_name}</i>:
-                <b class="${czyRozliczone ? 'text-decoration-line-through text-muted' : 'text-danger'} d-block">${kwotaUlamka.toFixed(2)} ${wal}</b>
+                <div class="mt-1">
+                  <b class="${czyRozliczone ? 'text-decoration-line-through text-muted' : 'text-danger'}">${kwotaUlamka.toFixed(2)} ${wal}</b>
+                  ${subPln}
+                </div>
               </div>
               <button class="btn btn-sm ${czyRozliczone ? 'btn-settled-yes' : 'btn-settled-no'}" onclick="window.oznaczRozliczenie(${w.id}, '${currentTeam}', ${!czyRozliczone})">
                 ${czyRozliczone ? '✓ Rozliczono' : '✕ Do rozliczenia'}
@@ -2026,7 +2165,10 @@ async function loadWallet() {
               <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
                 <div>
                   <span class="wallet-badge-fraction">1/4</span> <b>${ekipa}</b> za <i>${w.cost_name}</i>:
-                  <b class="${czyRozliczone ? 'text-decoration-line-through text-muted' : 'text-success'} d-block">${kwotaUlamka.toFixed(2)} ${wal}</b>
+                  <div class="mt-1">
+                    <b class="${czyRozliczone ? 'text-decoration-line-through text-muted' : 'text-success'}">${kwotaUlamka.toFixed(2)} ${wal}</b>
+                    ${subPln}
+                  </div>
                 </div>
                 <button class="btn btn-sm ${czyRozliczone ? 'btn-settled-yes' : 'btn-settled-no'}" onclick="window.oznaczRozliczenie(${w.id}, '${ekipa}', ${!czyRozliczone})">
                   ${czyRozliczone ? '✓ Rozliczono' : '✕ Do rozliczenia'}
@@ -2041,6 +2183,7 @@ async function loadWallet() {
         const kwotaUlamka = kwota / liczbaStron;
         const fractionLabel = `1/${liczbaStron}`;
         const wartoscHuf = kwotaUlamka * kursDoHuf;
+        const subPln = formatWalletSubPln(kwotaUlamka, wal);
 
         targets.forEach(target => {
           const teamTargetu = ekipyMapa[target] || target;
@@ -2056,7 +2199,10 @@ async function loadWallet() {
               <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
                 <div>
                   <span class="wallet-badge-fraction">${fractionLabel}</span> Dla: <b>${ktoPlacil} (${teamPlacacy})</b> za <i>${w.cost_name}</i>:
-                  <b class="${czyRozliczone ? 'text-decoration-line-through text-muted' : 'text-danger'} d-block">${kwotaUlamka.toFixed(2)} ${wal}</b>
+                  <div class="mt-1">
+                    <b class="${czyRozliczone ? 'text-decoration-line-through text-muted' : 'text-danger'}">${kwotaUlamka.toFixed(2)} ${wal}</b>
+                    ${subPln}
+                  </div>
                 </div>
                 <button class="btn btn-sm ${czyRozliczone ? 'btn-settled-yes' : 'btn-settled-no'}" onclick="window.oznaczRozliczenie(${w.id}, '${relacjaId}', ${!czyRozliczone})">
                   ${czyRozliczone ? '✓ Rozliczono' : '✕ Do rozliczenia'}
@@ -2070,7 +2216,10 @@ async function loadWallet() {
               <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
                 <div>
                   <span class="wallet-badge-fraction">${fractionLabel}</span> <b>${target}</b> za <i>${w.cost_name}</i>:
-                  <b class="${czyRozliczone ? 'text-decoration-line-through text-muted' : 'text-success'} d-block">${kwotaUlamka.toFixed(2)} ${wal}</b>
+                  <div class="mt-1">
+                    <b class="${czyRozliczone ? 'text-decoration-line-through text-muted' : 'text-success'}">${kwotaUlamka.toFixed(2)} ${wal}</b>
+                    ${subPln}
+                  </div>
                 </div>
                 <button class="btn btn-sm ${czyRozliczone ? 'btn-settled-yes' : 'btn-settled-no'}" onclick="window.oznaczRozliczenie(${w.id}, '${relacjaId}', ${!czyRozliczone})">
                   ${czyRozliczone ? '✓ Rozliczono' : '✕ Do rozliczenia'}
@@ -2086,22 +2235,52 @@ async function loadWallet() {
   oweContainer.innerHTML = mamyOddac.length ? mamyOddac.join("") : "<div class='text-muted small'>Czysto! Brak zaległości.</div>";
   dueContainer.innerHTML = ktosZalega.length ? ktosZalega.join("") : "<div class='text-muted small'>Brak zaległości ze strony innych.</div>";
 
-  summaryEl.innerText = `${razemHuf >= 0 ? '+ ' : '- '}${Math.round(Math.abs(razemHuf)).toLocaleString('pl-PL')} HUF`;
+  const totalHufAbs = Math.round(Math.abs(razemHuf));
+  const rateHufPln = bazaKursow["HUF_PLN"] || 0.0117;
+  const totalPlnAbs = (totalHufAbs * rateHufPln).toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  summaryEl.innerHTML = `
+    <div>${razemHuf >= 0 ? '+ ' : '- '}${totalHufAbs.toLocaleString('pl-PL')} HUF</div>
+    <div class="text-muted fw-normal" style="font-size: 0.8rem;">(~${totalPlnAbs} PLN)</div>
+  `;
   summaryEl.style.color = razemHuf >= 0 ? "green" : "red";
 }
 
+// Obsługa kliknięcia przycisku Rozliczono / Do rozliczenia
 window.oznaczRozliczenie = async function(costId, entityKey, markAsSettled) {
-  const { data } = await supabaseClient.from("costs").select("settled_by").eq("id", costId).single();
-  let currentSettled = (data && Array.isArray(data.settled_by)) ? [...data.settled_by] : [];
+  try {
+    const { data, error } = await supabaseClient
+      .from("costs")
+      .select("settled_by")
+      .eq("id", costId)
+      .single();
 
-  if (markAsSettled) {
-    if (!currentSettled.includes(entityKey)) currentSettled.push(entityKey);
-  } else {
-    currentSettled = currentSettled.filter(x => x !== entityKey);
+    if (error || !data) {
+      console.warn("Błąd pobierania rekordu do rozliczenia:", error);
+      return;
+    }
+
+    let currentSettled = Array.isArray(data.settled_by) ? [...data.settled_by] : [];
+
+    if (markAsSettled) {
+      if (!currentSettled.includes(entityKey)) currentSettled.push(entityKey);
+    } else {
+      currentSettled = currentSettled.filter(x => x !== entityKey);
+    }
+
+    const { error: updateError } = await supabaseClient
+      .from("costs")
+      .update({ settled_by: currentSettled })
+      .eq("id", costId);
+
+    if (!updateError) {
+      await loadWallet();
+    } else {
+      alert("Błąd zapisu statusu rozliczenia: " + updateError.message);
+    }
+  } catch (err) {
+    console.error("Wyjątek podczas rozliczania:", err);
   }
-
-  await supabaseClient.from("costs").update({ settled_by: currentSettled }).eq("id", costId);
-  loadWallet();
 };
 
 // ==============================================================================
