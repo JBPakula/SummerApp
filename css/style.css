@@ -527,3 +527,53 @@ a.btn-trasa-gmaps * {
   background: #FFFFFF;
   border: 1px solid #E2E8F0;
 }
+
+/* ==============================================================================
+   MODUŁ: PAMIĘTNIKI Z WAKACJI
+============================================================================== */
+.diary-card {
+  background: #FFFFFF;
+  border-radius: 14px;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  margin-bottom: 14px;
+}
+
+.diary-header-badge {
+  background: #FFF5F7;
+  border-bottom: 1px solid #FFE4E8;
+  padding: 8px 12px;
+}
+
+.diary-author-name {
+  color: var(--burgund);
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.diary-author-tagline {
+  color: #64748B;
+  font-size: 0.78rem;
+  font-style: italic;
+  line-height: 1.25;
+  margin-top: 1px;
+}
+
+.diary-quote-box {
+  background: #F8FAFC;
+  border-left: 4px solid var(--burgund);
+  border-radius: 0 8px 8px 0;
+  padding: 10px 14px;
+  font-size: 0.92rem;
+  font-style: italic;
+  color: #1E293B;
+  line-height: 1.45;
+}
+
+.diary-photo-preview {
+  width: 100%;
+  max-height: 350px;
+  object-fit: cover;
+  border-radius: 8px;
+}

@@ -154,12 +154,23 @@
             <div class="card dashboard-card shadow-sm h-100" onclick="switchTab('🎲 Rozgrywki')">
               <div class="card-body text-center py-2 px-1">
                 <div class="fw-bold tile-title">Rozgrywki</div>
-                <div class="tile-desc text-muted">Blokus, Remik</div>
+                <div class="tile-desc text-muted">Gramy w gry</div>
               </div>
             </div>
           </div>
         </div>
+        <!-- 5. WIERSZ: PAMIĘTNIKI Z WAKACJI (Z ZACHOWANIEM ODSTĘPÓW) -->
+          <div class="col-12 mt-2">
+            <div class="card py-2 px-3 text-center border shadow-sm rounded-4 stado-dashboard-card" 
+                 style="cursor: pointer;" 
+                 onclick="switchTab('tab-diary')">
+              <div class="fw-bold" style="color: var(--burgund); font-size: 1rem; line-height: 1.2;">Pamiętniki z wakacji</div>
+              <div class="text-muted small" style="font-size: 11px;">Zdjęcia, cytaty i dramy z wyjazdu</div>
+            </div>
+          </div>
+
       </section>
+
 
 <!-- ========================================================================== -->
       <!-- 1. MODUŁ: MAPA -->
@@ -446,7 +457,7 @@
           <div id="archivedCostsList" style="display: none;" class="mt-2 pt-2 border-top"></div>
         </div>
       </section>
-      
+
       <!-- ========================================================================== -->
       <!-- 4. MODUŁ: ZAKUPY -->
       <!-- ========================================================================== -->
@@ -729,7 +740,70 @@
         </div>
       </section>
 
-    </main>
+    
+
+<!-- ========================================================================== -->
+      <!-- 9. MODUŁ: PAMIĘTNIKI Z WAKACJI -->
+      <!-- ========================================================================== -->
+      <section id="tab-diary" class="app-tab" style="display: none;">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+          <h4 class="fw-bold mb-0" style="color: var(--burgund);">📸 Pamiętniki z wakacji</h4>
+          <button class="btn btn-sm btn-outline-secondary" onclick="switchTab('dashboard')">
+            <i class="bi bi-arrow-left"></i> Wróć
+          </button>
+        </div>
+
+        <!-- ZWIJANA KARTA: NOWY WPIS -->
+        <div class="card p-3 border-0 shadow-sm rounded-4 mb-3">
+          <div class="d-flex justify-content-between align-items-center" style="cursor: pointer;" onclick="toggleNewDiaryForm()">
+            <h6 class="fw-bold mb-0" style="color: var(--burgund);">➕ Nowy wpis do pamiętnika</h6>
+            <i id="iconNewDiaryToggle" class="bi bi-chevron-down text-muted fs-5"></i>
+          </div>
+
+          <div id="newDiaryFormCollapse" style="display: none;" class="mt-3 pt-2 border-top">
+            <form id="formDiary">
+              <!-- WYBÓR TYPU -->
+              <div class="d-flex gap-2 mb-3">
+                <button type="button" id="btnTypeQuote" class="btn btn-sm btn-burgund flex-fill py-1" onclick="setDiaryContentType('quote')">
+                  💬 Złota myśl / Cytat
+                </button>
+                <button type="button" id="btnTypePhoto" class="btn btn-sm btn-outline-secondary flex-fill py-1" onclick="setDiaryContentType('photo')">
+                  📷 Zdjęcie z podpisem
+                </button>
+              </div>
+
+              <!-- POLE NA ZDJĘCIE -->
+              <div id="diaryPhotoFieldWrapper" style="display: none;" class="mb-3">
+                <label class="small fw-bold text-muted mb-1">Wybierz zdjęcie:</label>
+                <input type="file" id="diaryPhotoFile" class="form-control form-control-sm" accept="image/*" onchange="previewDiarySelectedPhoto(this)">
+                <div id="diaryPhotoPreviewBox" class="mt-2 text-center" style="display: none;">
+                  <img id="diaryPhotoPreviewImg" src="" class="img-thumbnail" style="max-height: 180px; object-fit: cover;">
+                </div>
+              </div>
+
+              <!-- POLE TEKSTOWE -->
+              <div class="mb-3">
+                <label id="diaryTextLabel" class="small fw-bold text-muted mb-1">Treść cytatu / dramy:</label>
+                <textarea id="diaryTextContent" class="form-control form-control-sm" rows="3" required placeholder="Co się właśnie wydarzyło?..."></textarea>
+              </div>
+
+              <button type="submit" id="btnSubmitDiary" class="btn btn-burgund btn-sm w-100 py-2">
+                Opublikuj w kronice
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- FILTR AUTORÓW -->
+        <div class="d-flex align-items-center gap-2 mb-3 overflow-auto pb-1" id="diaryAuthorFilters">
+          <button class="btn btn-sm btn-burgund px-3 py-1 active-diary-filter flex-shrink-0" onclick="filterDiaryByAuthor('all', this)">Wszyscy</button>
+        </div>
+
+        <!-- OŚ CZASU (LISTA WPISÓW) -->
+        <div id="diaryEntriesContainer" class="mb-4"></div>
+      </section>
+
+</main>
 
 <!-- Stopka -->
     <footer class="footer-fixed d-flex justify-content-between align-items-center">

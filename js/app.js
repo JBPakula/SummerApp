@@ -266,43 +266,42 @@ function renderDashboardDate() {
   checkForumUnreadNotifications();
 }
 
-function switchTab(tabName) {
-  localStorage.setItem("active_tab", tabName);
+function switchTab(tabId) {
+  if (!tabId) tabId = "dashboard";
 
-  document.querySelectorAll(".app-tab").forEach(el => el.style.display = "none");
+  // Ukryj wszystkie zakładki
+  const tabs = document.querySelectorAll(".app-tab");
+  tabs.forEach(t => t.style.display = "none");
 
-  if (tabName === "dashboard" || tabName.includes("Pulpit")) {
-    document.getElementById("tab-dashboard").style.display = "block";
-    renderDashboardDate();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  } else if (tabName.includes("Mapa")) {
-    document.getElementById("tab-map").style.display = "block";
-    loadMapData();
-    if (mapInstance) setTimeout(() => mapInstance.invalidateSize(), 200);
-  } else if (tabName.includes("Forum")) {
-    document.getElementById("tab-forum").style.display = "block";
-    showTopicsList();
-  } else if (tabName.includes("Wydatki")) {
-    document.getElementById("tab-costs").style.display = "block";
-    loadCosts();
-  } else if (tabName.includes("Zakupy")) {
-    document.getElementById("tab-shopping").style.display = "block";
-    loadShoppingLists();
-  } else if (tabName.includes("Kantor")) {
-    document.getElementById("tab-exchange").style.display = "block";
-    przeliczKantor();
-  } else if (tabName.includes("Portfel")) {
-    document.getElementById("tab-wallet").style.display = "block";
-    loadWallet();
-  } else if (tabName.includes("bilety") || tabName.includes("Bilety") || tabName.includes("Płacimy") || tabName === "calc") {
-    const tabCalc = document.getElementById("tab-calc");
-    if (tabCalc) {
-      tabCalc.style.display = "block";
-      przeliczBilety();
+  const dash = document.getElementById("dashboardView") || document.getElementById("tab-dashboard");
+
+  if (tabId === "dashboard" || tabId === "tab-dashboard") {
+    if (dash) dash.style.display = "block";
+    localStorage.setItem("active_tab", "dashboard");
+    return;
+  }
+
+  if (dash) dash.style.display = "none";
+
+  // Obsługa ID z prefiksem lub bez
+  let targetEl = document.getElementById(tabId) || document.getElementById("tab-" + tabId.replace("tab-", ""));
+
+  if (targetEl) {
+    targetEl.style.display = "block";
+    localStorage.setItem("active_tab", targetEl.id);
+
+    // Wywołania modułowe
+    if (targetEl.id === "tab-diary" || tabId.includes("diary")) {
+      loadDiary();
+    } else if (targetEl.id === "tab-forum" || tabId.includes("forum")) {
+      loadForum();
+    } else if (targetEl.id === "tab-costs" || tabId.includes("costs")) {
+      loadCosts();
+    } else if (targetEl.id === "tab-wallet" || tabId.includes("wallet")) {
+      loadWallet();
+    } else if (targetEl.id === "tab-map" || tabId.includes("map")) {
+      loadMapData();
     }
-  } else if (tabName.includes("Rozgrywki") || tabName === "games") {
-    document.getElementById("tab-games").style.display = "block";
-    loadGames();
   }
 }
 
@@ -2629,6 +2628,340 @@ async function loadPastGames() {
   }
 }
 
+// ==============================================================================
+// 9. MODUŁ: PAMIĘTNIKI Z WAKACJI
+// ==============================================================================
+let currentDiaryContentType = 'quote';
+let diaryActiveAuthorFilter = 'all';
+let diaryCachedUsers = {};
+
+window.toggleNewDiaryForm = function() {
+  const box = document.getElementById("newDiaryFormCollapse");
+  const icon = document.getElementById("iconNewDiaryToggle");
+  if (!box) return;
+  const isHidden = box.style.display === "none";
+  box.style.display = isHidden ? "block" : "none";
+  if (icon) icon.className = isHidden ? "bi bi-chevron-up text-muted fs-5" : "bi bi-chevron-down text-muted fs-5";
+};
+
+window.setDiaryContentType = function(type) {
+  currentDiaryContentType = type;
+  const btnQuote = document.getElementById("btnTypeQuote");
+  const btnPhoto = document.getElementById("btnTypePhoto");
+  const photoBox = document.getElementById("diaryPhotoFieldWrapper");
+  const textLabel = document.getElementById("diaryTextLabel");
+  const textArea = document.getElementById("diaryTextContent");
+
+  if (type === 'photo') {
+    if (btnPhoto) btnPhoto.className = "btn btn-sm btn-burgund flex-fill py-1";
+    if (btnQuote) btnQuote.className = "btn btn-sm btn-outline-secondary flex-fill py-1";
+    if (photoBox) photoBox.style.display = "block";
+    if (textLabel) textLabel.innerText = "Podpis do zdjęcia (opcjonalnie):";
+    if (textArea) {
+      textArea.required = false;
+      textArea.placeholder = "Krótki komentarz do zdjęcia...";
+    }
+  } else {
+    if (btnQuote) btnQuote.className = "btn btn-sm btn-burgund flex-fill py-1";
+    if (btnPhoto) btnPhoto.className = "btn btn-sm btn-outline-secondary flex-fill py-1";
+    if (photoBox) photoBox.style.display = "none";
+    if (textLabel) textLabel.innerText = "Treść cytatu / dramy:";
+    if (textArea) {
+      textArea.required = true;
+      textArea.placeholder = "Co się właśnie wydarzyło?...";
+    }
+  }
+};
+
+window.previewDiarySelectedPhoto = function(input) {
+  const previewBox = document.getElementById("diaryPhotoPreviewBox");
+  const previewImg = document.getElementById("diaryPhotoPreviewImg");
+  if (input.files && input.files[0]) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      previewImg.src = e.target.result;
+      previewBox.style.display = "block";
+    };
+    reader.readAsDataURL(input.files[0]);
+  } else if (previewBox) {
+    previewBox.style.display = "none";
+  }
+};
+
+async function uploadDiaryPhoto(file) {
+  if (!file) return null;
+  try {
+    const cleanFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const filePath = `${Date.now()}_${cleanFileName}`;
+
+    const { error } = await supabaseClient.storage
+      .from('diary-photos')
+      .upload(filePath, file, { cacheControl: '3600', upsert: false });
+
+    if (error) {
+      alert("Błąd wgrywania zdjęcia: " + error.message);
+      return null;
+    }
+
+    const { data: publicUrlData } = supabaseClient.storage
+      .from('diary-photos')
+      .getPublicUrl(filePath);
+
+    return publicUrlData.publicUrl;
+  } catch (err) {
+    console.error("Błąd Storage:", err);
+    return null;
+  }
+}
+
+async function loadDiary() {
+  const container = document.getElementById("diaryEntriesContainer");
+  if (!container) return;
+
+  container.innerHTML = "<div class='text-muted small py-2 text-center'>Ładowanie kroniki Stada...</div>";
+
+  try {
+    // 1. Pobranie użytkowników i opisów
+    if (Object.keys(diaryCachedUsers).length === 0) {
+      const { data: users } = await supabaseClient.from("users").select("id, login, age, descriptions");
+      if (users) {
+        users.forEach(u => {
+          if (u && u.login) diaryCachedUsers[u.login.toLowerCase()] = u;
+        });
+        renderDiaryFilterBadges(users);
+      }
+    }
+
+    // 2. Pobranie wpisów
+    const { data: entries, error } = await supabaseClient
+      .from("diary_entries")
+      .select("*")
+      .eq("deleted", false)
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      container.innerHTML = `<div class='text-danger small p-3'>Błąd bazy: ${error.message}</div>`;
+      return;
+    }
+
+    if (!entries || entries.length === 0) {
+      container.innerHTML = "<div class='text-center text-muted small p-4 bg-light rounded-4 border'>Kronika jest jeszcze pusta. Dodaj pierwszy wpis powyżej! ✍️</div>";
+      return;
+    }
+
+    // 3. Przypisanie rotujących opisów na podstawie liczby postów każdego autora
+    const authorPostCounters = {};
+    const entriesWithDescriptions = entries.map(entry => {
+      const authorKey = (entry.author_login || '').toLowerCase();
+      authorPostCounters[authorKey] = (authorPostCounters[authorKey] || 0) + 1;
+
+      const userObj = diaryCachedUsers[authorKey] || { age: '', descriptions: [] };
+      const descList = Array.isArray(userObj.descriptions) && userObj.descriptions.length > 0
+        ? userObj.descriptions
+        : ['Uczestnik wyjazdu'];
+
+      const descIndex = (authorPostCounters[authorKey] - 1) % descList.length;
+      const assignedDescription = descList[descIndex];
+
+      return {
+        ...entry,
+        userAge: userObj.age || '',
+        tagline: assignedDescription
+      };
+    });
+
+    // Najnowsze wpisy u góry
+    const sortedEntries = entriesWithDescriptions.reverse();
+
+    // Filtrowanie autora
+    const filtered = diaryActiveAuthorFilter === 'all'
+      ? sortedEntries
+      : sortedEntries.filter(e => (e.author_login || '').toLowerCase() === diaryActiveAuthorFilter.toLowerCase());
+
+    // Grupowanie według dat
+    const groupedByDate = {};
+    filtered.forEach(e => {
+      const dateKey = e.trip_date || (e.created_at ? e.created_at.substring(0, 10) : 'Wyprawa');
+      if (!groupedByDate[dateKey]) groupedByDate[dateKey] = [];
+      groupedByDate[dateKey].push(e);
+    });
+
+    const todayStr = new Date().toISOString().substring(0, 10);
+    const nowTime = new Date().getTime();
+    const dateKeys = Object.keys(groupedByDate);
+
+    if (dateKeys.length === 0) {
+      container.innerHTML = "<div class='text-center text-muted small p-4'>Brak wpisów dla wybranego autora.</div>";
+      return;
+    }
+
+    container.innerHTML = dateKeys.map((dateStr, idx) => {
+      const isCurrentDay = (dateStr === todayStr) || (idx === 0);
+      const dayEntries = groupedByDate[dateStr];
+
+      return `
+        <div class="mb-3">
+          <div class="d-flex justify-content-between align-items-center p-2 bg-light rounded-3 border mb-2" 
+               style="cursor: pointer;" onclick="toggleDiaryDateGroup('${dateStr}')">
+            <span class="fw-bold small text-dark"><i class="bi bi-calendar-heart me-1"></i> ${dateStr} (${dayEntries.length})</span>
+            <i id="diary-icon-${dateStr}" class="bi ${isCurrentDay ? 'bi-chevron-up' : 'bi-chevron-down'} text-muted"></i>
+          </div>
+          <div id="diary-group-${dateStr}" style="display: ${isCurrentDay ? 'block' : 'none'};">
+            ${dayEntries.map(e => renderSingleDiaryCard(e, nowTime)).join("")}
+          </div>
+        </div>
+      `;
+    }).join("");
+
+  } catch (err) {
+    console.error("Błąd w loadDiary:", err);
+    container.innerHTML = `<div class='text-danger small p-3'>Wystąpił błąd podczas ładowania kroniki: ${err.message}</div>`;
+  }
+}
+
+function renderSingleDiaryCard(entry, nowTime) {
+  const author = entry.author_login || "Uczestnik";
+  const avatar = renderAvatarHtml(author);
+  const ageLabel = entry.userAge ? `(${entry.userAge}${isNaN(entry.userAge) ? '' : ' lat'})` : '';
+  const diffSec = (nowTime - new Date(entry.created_at).getTime()) / 1000;
+  const isAuthor = (entry.user_id == currentUserId || (currentUser && author.toLowerCase() === currentUser.toLowerCase()));
+
+  const dateObj = new Date(entry.created_at);
+  const timeStr = dateObj.toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" });
+
+  let deleteBtn = "";
+  if (isAuthor && diffSec <= 60) {
+    deleteBtn = `
+      <button class="btn btn-sm btn-outline-danger py-0 px-2 mt-1" style="font-size: 10.5px;" onclick="deleteDiaryEntry(${entry.id})">
+        🗑️ (${Math.max(0, Math.round(60 - diffSec))}s)
+      </button>
+    `;
+  }
+
+  const isPhoto = entry.content_type === 'photo' && entry.photo_url;
+
+  return `
+    <div class="diary-card">
+      <div class="diary-header-badge d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center pe-2">
+          ${avatar}
+          <div>
+            <div class="diary-author-name">${author} <span class="fw-normal text-muted" style="font-size: 0.8rem;">${ageLabel}</span></div>
+            <div class="diary-author-tagline">${entry.tagline}</div>
+          </div>
+        </div>
+        <div class="d-flex flex-column align-items-end flex-shrink-0">
+          <span class="text-muted" style="font-size: 10.5px;">${timeStr}</span>
+          ${deleteBtn}
+        </div>
+      </div>
+
+      <div class="p-3">
+        ${isPhoto ? `
+          <img src="${entry.photo_url}" class="diary-photo-preview mb-2 shadow-sm" alt="Zdjęcie z wyjazdu">
+          ${entry.text_content ? `<div class="small text-dark mt-1" style="font-size: 0.92rem;">${entry.text_content}</div>` : ''}
+        ` : `
+          <div class="diary-quote-box">
+            „${entry.text_content}”
+          </div>
+        `}
+      </div>
+    </div>
+  `;
+}
+
+function renderDiaryFilterBadges(users) {
+  const container = document.getElementById("diaryAuthorFilters");
+  if (!container) return;
+
+  const validUsers = users.filter(u => u && u.login);
+  const buttons = validUsers.map(u => `
+    <button class="btn btn-sm btn-outline-secondary px-3 py-1 flex-shrink-0" onclick="filterDiaryByAuthor('${u.login}', this)">
+      ${u.login}
+    </button>
+  `).join("");
+
+  container.innerHTML = `
+    <button class="btn btn-sm btn-burgund px-3 py-1 active-diary-filter flex-shrink-0" onclick="filterDiaryByAuthor('all', this)">Wszyscy</button>
+    ${buttons}
+  `;
+}
+
+window.filterDiaryByAuthor = function(authorLogin, btnElement) {
+  diaryActiveAuthorFilter = authorLogin;
+  const buttons = document.querySelectorAll("#diaryAuthorFilters button");
+  buttons.forEach(b => b.className = "btn btn-sm btn-outline-secondary px-3 py-1 flex-shrink-0");
+  if (btnElement) btnElement.className = "btn btn-sm btn-burgund px-3 py-1 active-diary-filter flex-shrink-0";
+  loadDiary();
+};
+
+window.toggleDiaryDateGroup = function(dateKey) {
+  const box = document.getElementById(`diary-group-${dateKey}`);
+  const icon = document.getElementById(`diary-icon-${dateKey}`);
+  if (!box) return;
+  const isHidden = box.style.display === "none";
+  box.style.display = isHidden ? "block" : "none";
+  if (icon) icon.className = isHidden ? "bi bi-chevron-up text-muted" : "bi bi-chevron-down text-muted";
+};
+
+const formDiary = document.getElementById("formDiary");
+if (formDiary) {
+  formDiary.onsubmit = async (e) => {
+    e.preventDefault();
+    const btnSubmit = document.getElementById("btnSubmitDiary");
+    const textArea = document.getElementById("diaryTextContent");
+    const photoInput = document.getElementById("diaryPhotoFile");
+    const text = textArea.value.trim();
+
+    btnSubmit.disabled = true;
+    btnSubmit.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Publikuję...`;
+
+    let photoUrl = null;
+    if (currentDiaryContentType === 'photo') {
+      if (!photoInput.files || !photoInput.files[0]) {
+        alert("Wybierz zdjęcie przed publikacją!");
+        btnSubmit.disabled = false;
+        btnSubmit.innerText = "Opublikuj w kronice";
+        return;
+      }
+      photoUrl = await uploadDiaryPhoto(photoInput.files[0]);
+      if (!photoUrl) {
+        btnSubmit.disabled = false;
+        btnSubmit.innerText = "Opublikuj w kronice";
+        return;
+      }
+    }
+
+    const { error } = await supabaseClient.from("diary_entries").insert({
+      user_id: currentUserId,
+      author_login: currentUser,
+      content_type: currentDiaryContentType,
+      text_content: text || null,
+      photo_url: photoUrl,
+      trip_date: new Date().toISOString().substring(0, 10),
+      deleted: false
+    });
+
+    btnSubmit.disabled = false;
+    btnSubmit.innerText = "Opublikuj w kronice";
+
+    if (!error) {
+      formDiary.reset();
+      const pBox = document.getElementById("diaryPhotoPreviewBox");
+      if (pBox) pBox.style.display = "none";
+      toggleNewDiaryForm();
+      loadDiary();
+    } else {
+      alert("Błąd publikacji wpisu: " + error.message);
+    }
+  };
+}
+
+window.deleteDiaryEntry = async function(entryId) {
+  if (!confirm("Czy na pewno chcesz usunąć ten wpis z kroniki?")) return;
+  await supabaseClient.from("diary_entries").update({ deleted: true }).eq("id", entryId);
+  loadDiary();
+};
 // ==============================================================================
 // 9. GLOBALNE LISTENERY ZDARZEŃ
 // ==============================================================================
