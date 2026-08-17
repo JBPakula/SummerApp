@@ -2627,7 +2627,6 @@ async function loadPastGames() {
     container.innerHTML = "<div class='text-muted small'>Brak zakończonych rozgrywek.</div>";
   }
 }
-
 // ==============================================================================
 // 9. MODUŁ: PAMIĘTNIKI Z WAKACJI
 // ==============================================================================
@@ -2721,18 +2720,27 @@ async function loadDiary() {
   container.innerHTML = "<div class='text-muted small py-2 text-center'>Ładowanie kroniki Stada...</div>";
 
   try {
-    // 1. Pobranie użytkowników i opisów
-    if (Object.keys(diaryCachedUsers).length === 0) {
-      const { data: users } = await supabaseClient.from("users").select("id, login, age, descriptions");
-      if (users) {
-        users.forEach(u => {
-          if (u && u.login) diaryCachedUsers[u.login.toLowerCase()] = u;
-        });
-        renderDiaryFilterBadges(users);
-      }
+    // 1. Pobranie danych o osobach (wiek + opisy) z tabeli users
+    const { data: dbUsers, error: usersErr } = await supabaseClient
+      .from("users")
+      .select("id, login, age, descriptions");
+
+    diaryCachedUsers = {};
+    if (dbUsers && !usersErr) {
+      dbUsers.forEach(u => {
+        if (u && u.login) {
+          const lk = u.login.trim().toLowerCase();
+          diaryCachedUsers[lk] = {
+            login: u.login,
+            age: u.age || '',
+            descriptions: Array.isArray(u.descriptions) ? u.descriptions : []
+          };
+        }
+      });
+      renderDiaryFilterBadges(dbUsers);
     }
 
-    // 2. Pobranie wpisów
+    // 2. Pobranie aktywnych wpisów z kroniki
     const { data: entries, error } = await supabaseClient
       .from("diary_entries")
       .select("*")
@@ -2740,7 +2748,7 @@ async function loadDiary() {
       .order("created_at", { ascending: true });
 
     if (error) {
-      container.innerHTML = `<div class='text-danger small p-3'>Błąd bazy: ${error.message}</div>`;
+      container.innerHTML = `<div class='text-danger small p-3 text-center'>Błąd bazy: ${error.message}</div>`;
       return;
     }
 
@@ -2749,18 +2757,16 @@ async function loadDiary() {
       return;
     }
 
-    // 3. Przypisanie rotujących opisów na podstawie liczby postów każdego autora
-    const authorPostCounters = {};
+    // 3. Połączenie wpisów z danymi użytkownika i rotacją opisów
+    const authorCounters = {};
     const entriesWithDescriptions = entries.map(entry => {
-      const authorKey = (entry.author_login || '').toLowerCase();
-      authorPostCounters[authorKey] = (authorPostCounters[authorKey] || 0) + 1;
+      const authorKey = (entry.author_login || '').trim().toLowerCase();
+      authorCounters[authorKey] = (authorCounters[authorKey] || 0) + 1;
 
       const userObj = diaryCachedUsers[authorKey] || { age: '', descriptions: [] };
-      const descList = Array.isArray(userObj.descriptions) && userObj.descriptions.length > 0
-        ? userObj.descriptions
-        : ['Uczestnik wyjazdu'];
+      const descList = userObj.descriptions.length > 0 ? userObj.descriptions : ['Uczestnik wyjazdu'];
 
-      const descIndex = (authorPostCounters[authorKey] - 1) % descList.length;
+      const descIndex = (authorCounters[authorKey] - 1) % descList.length;
       const assignedDescription = descList[descIndex];
 
       return {
@@ -2770,15 +2776,15 @@ async function loadDiary() {
       };
     });
 
-    // Najnowsze wpisy u góry
+    // Najnowsze wpisy na samej górze
     const sortedEntries = entriesWithDescriptions.reverse();
 
-    // Filtrowanie autora
+    // Filtrowanie wybranego autora
     const filtered = diaryActiveAuthorFilter === 'all'
       ? sortedEntries
-      : sortedEntries.filter(e => (e.author_login || '').toLowerCase() === diaryActiveAuthorFilter.toLowerCase());
+      : sortedEntries.filter(e => (e.author_login || '').trim().toLowerCase() === diaryActiveAuthorFilter.trim().toLowerCase());
 
-    // Grupowanie według dat
+    // Grupowanie wpisów po trip_date
     const groupedByDate = {};
     filtered.forEach(e => {
       const dateKey = e.trip_date || (e.created_at ? e.created_at.substring(0, 10) : 'Wyprawa');
@@ -2787,7 +2793,7 @@ async function loadDiary() {
     });
 
     const todayStr = new Date().toISOString().substring(0, 10);
-    const nowTime = new Date().getTime();
+    const nowTime = Date.now();
     const dateKeys = Object.keys(groupedByDate);
 
     if (dateKeys.length === 0) {
@@ -2815,16 +2821,28 @@ async function loadDiary() {
 
   } catch (err) {
     console.error("Błąd w loadDiary:", err);
-    container.innerHTML = `<div class='text-danger small p-3'>Wystąpił błąd podczas ładowania kroniki: ${err.message}</div>`;
+    container.innerHTML = `<div class='text-danger small p-3 text-center'>Wystąpił błąd: ${err.message}</div>`;
   }
 }
 
 function renderSingleDiaryCard(entry, nowTime) {
   const author = entry.author_login || "Uczestnik";
   const avatar = renderAvatarHtml(author);
-  const ageLabel = entry.userAge ? `(${entry.userAge}${isNaN(entry.userAge) ? '' : ' lat'})` : '';
-  const diffSec = (nowTime - new Date(entry.created_at).getTime()) / 1000;
-  const isAuthor = (entry.user_id == currentUserId || (currentUser && author.toLowerCase() === currentUser.toLowerCase()));
+  
+  // Formatowanie wieku: (35 l.) lub (doświadczony)
+  let ageFormatted = '';
+  if (entry.userAge) {
+    const rawAge = String(entry.userAge).trim();
+    if (!isNaN(rawAge) && rawAge !== '') {
+      ageFormatted = `(${rawAge} l.) `;
+    } else {
+      ageFormatted = `(${rawAge}) `;
+    }
+  }
+
+  const createdAtTime = new Date(entry.created_at).getTime();
+  const diffSec = Math.floor((nowTime - createdAtTime) / 1000);
+  const isAuthor = (String(entry.user_id) === String(currentUserId) || (currentUser && author.toLowerCase() === currentUser.toLowerCase()));
 
   const dateObj = new Date(entry.created_at);
   const timeStr = dateObj.toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" });
@@ -2832,22 +2850,22 @@ function renderSingleDiaryCard(entry, nowTime) {
   let deleteBtn = "";
   if (isAuthor && diffSec <= 60) {
     deleteBtn = `
-      <button class="btn btn-sm btn-outline-danger py-0 px-2 mt-1" style="font-size: 10.5px;" onclick="deleteDiaryEntry(${entry.id})">
-        🗑️ (${Math.max(0, Math.round(60 - diffSec))}s)
+      <button class="btn btn-sm btn-outline-danger py-0 px-2 mt-1" style="font-size: 10.5px;" onclick="window.deleteDiaryEntry(${entry.id})">
+        🗑️ (${Math.max(0, 60 - diffSec)}s)
       </button>
     `;
   }
 
-  const isPhoto = entry.content_type === 'photo' && entry.photo_url;
+  const isPhoto = (entry.content_type === 'photo' && entry.photo_url);
 
   return `
     <div class="diary-card">
       <div class="diary-header-badge d-flex justify-content-between align-items-center">
         <div class="d-flex align-items-center pe-2">
           ${avatar}
-          <div>
-            <div class="diary-author-name">${author} <span class="fw-normal text-muted" style="font-size: 0.8rem;">${ageLabel}</span></div>
-            <div class="diary-author-tagline">${entry.tagline}</div>
+          <div class="ms-1">
+            <div class="diary-author-name">${author}</div>
+            <div class="diary-author-tagline">${ageFormatted}${entry.tagline || ''}</div>
           </div>
         </div>
         <div class="d-flex flex-column align-items-end flex-shrink-0">
@@ -2858,7 +2876,7 @@ function renderSingleDiaryCard(entry, nowTime) {
 
       <div class="p-3">
         ${isPhoto ? `
-          <img src="${entry.photo_url}" class="diary-photo-preview mb-2 shadow-sm" alt="Zdjęcie z wyjazdu">
+          <img src="${entry.photo_url}" class="diary-photo-preview mb-2 shadow-sm" alt="Zdjęcie">
           ${entry.text_content ? `<div class="small text-dark mt-1" style="font-size: 0.92rem;">${entry.text_content}</div>` : ''}
         ` : `
           <div class="diary-quote-box">
@@ -2876,13 +2894,13 @@ function renderDiaryFilterBadges(users) {
 
   const validUsers = users.filter(u => u && u.login);
   const buttons = validUsers.map(u => `
-    <button class="btn btn-sm btn-outline-secondary px-3 py-1 flex-shrink-0" onclick="filterDiaryByAuthor('${u.login}', this)">
+    <button class="btn btn-sm btn-outline-secondary px-3 py-1 flex-shrink-0" onclick="window.filterDiaryByAuthor('${u.login}', this)">
       ${u.login}
     </button>
   `).join("");
 
   container.innerHTML = `
-    <button class="btn btn-sm btn-burgund px-3 py-1 active-diary-filter flex-shrink-0" onclick="filterDiaryByAuthor('all', this)">Wszyscy</button>
+    <button class="btn btn-sm btn-burgund px-3 py-1 active-diary-filter flex-shrink-0" onclick="window.filterDiaryByAuthor('all', this)">Wszyscy</button>
     ${buttons}
   `;
 }
@@ -2917,7 +2935,9 @@ if (formDiary) {
     btnSubmit.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Publikuję...`;
 
     let photoUrl = null;
-    if (currentDiaryContentType === 'photo') {
+    const dbContentType = (currentDiaryContentType === 'photo') ? 'photo' : 'text';
+
+    if (dbContentType === 'photo') {
       if (!photoInput.files || !photoInput.files[0]) {
         alert("Wybierz zdjęcie przed publikacją!");
         btnSubmit.disabled = false;
@@ -2935,7 +2955,7 @@ if (formDiary) {
     const { error } = await supabaseClient.from("diary_entries").insert({
       user_id: currentUserId,
       author_login: currentUser,
-      content_type: currentDiaryContentType,
+      content_type: dbContentType,
       text_content: text || null,
       photo_url: photoUrl,
       trip_date: new Date().toISOString().substring(0, 10),
@@ -2959,11 +2979,21 @@ if (formDiary) {
 
 window.deleteDiaryEntry = async function(entryId) {
   if (!confirm("Czy na pewno chcesz usunąć ten wpis z kroniki?")) return;
-  await supabaseClient.from("diary_entries").update({ deleted: true }).eq("id", entryId);
-  loadDiary();
+  const parsedId = Number(entryId);
+  const { error } = await supabaseClient
+    .from("diary_entries")
+    .update({ deleted: true })
+    .eq("id", parsedId);
+
+  if (error) {
+    alert("Błąd usuwania wpisu: " + error.message);
+  } else {
+    await loadDiary();
+  }
 };
+
 // ==============================================================================
-// 9. GLOBALNE LISTENERY ZDARZEŃ
+// 10. GLOBALNE LISTENERY ZDARZEŃ
 // ==============================================================================
 function setupEventListeners() {
   ["calcNormal", "calcReduced", "calcCurrency"].forEach(id => {
