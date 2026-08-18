@@ -2772,7 +2772,7 @@ async function loadPastGames() {
 }
 
 // ==============================================================================
-// 9. MODUŁ: PAMIĘTNIKI Z WAKACJI
+// 9. MODUŁ: PAMIĘTNIKI Z WAKACJI (Z OBSŁUGĄ POLUBIEŃ / LAJKÓW)
 // ==============================================================================
 let currentDiaryContentType = 'quote';
 let diaryActiveAuthorFilter = 'all';
@@ -2864,6 +2864,7 @@ async function loadDiary() {
   container.innerHTML = "<div class='text-muted small py-2 text-center'>Ładowanie kroniki Stada...</div>";
 
   try {
+    // 1. Pobranie użytkowników (wiek i opisy)
     const { data: dbUsers, error: usersErr } = await supabaseClient
       .from("users")
       .select("id, login, age, descriptions");
@@ -2883,6 +2884,7 @@ async function loadDiary() {
       renderDiaryFilterBadges(dbUsers);
     }
 
+    // 2. Pobranie aktywnych wpisów
     const { data: entries, error } = await supabaseClient
       .from("diary_entries")
       .select("*")
@@ -2899,6 +2901,24 @@ async function loadDiary() {
       return;
     }
 
+    // 3. Pobranie polubień dla widocznych wpisów
+    const entryIds = entries.map(e => e.id);
+    const { data: likesData } = await supabaseClient
+      .from("diary_likes")
+      .select("entry_id, user_id")
+      .in("entry_id", entryIds);
+
+    const likesMap = {};
+    const myLikedSet = new Set();
+
+    if (likesData) {
+      likesData.forEach(l => {
+        likesMap[l.entry_id] = (likesMap[l.entry_id] || 0) + 1;
+        if (l.user_id == currentUserId) myLikedSet.add(l.entry_id);
+      });
+    }
+
+    // 4. Połączenie wpisów z rotacją opisów i wiekiem
     const authorCounters = {};
     const entriesWithDescriptions = entries.map(entry => {
       const authorKey = (entry.author_login || '').trim().toLowerCase();
@@ -2913,7 +2933,9 @@ async function loadDiary() {
       return {
         ...entry,
         userAge: userObj.age || '',
-        tagline: assignedDescription
+        tagline: assignedDescription,
+        likeCount: likesMap[entry.id] || 0,
+        isLiked: myLikedSet.has(entry.id)
       };
     });
 
@@ -2993,7 +3015,7 @@ function renderSingleDiaryCard(entry, nowTime) {
     `;
   }
 
-const isPhoto = (entry.content_type === 'photo' && entry.photo_url);
+  const isPhoto = (entry.content_type === 'photo' && entry.photo_url);
 
   return `
     <div class="diary-card">
@@ -3020,10 +3042,50 @@ const isPhoto = (entry.content_type === 'photo' && entry.photo_url);
             „${entry.text_content}”
           </div>
         `}
+
+        <div class="d-flex justify-content-end align-items-center pt-2 mt-2 border-top">
+          <button class="btn-forum-like ${entry.isLiked ? 'liked' : ''}" onclick="window.toggleDiaryLike(${entry.id}, this)">
+            <i class="bi ${entry.isLiked ? 'bi-heart-fill' : 'bi-heart'}"></i>
+            <span class="like-counter">${entry.likeCount > 0 ? entry.likeCount : ''}</span>
+          </button>
+        </div>
       </div>
     </div>
   `;
 }
+
+// Obsługa płynnego lajkowania wpisów w pamiętniku
+window.toggleDiaryLike = async function(entryId, btnElement) {
+  if (!currentUserId || !btnElement) return;
+
+  const icon = btnElement.querySelector("i");
+  const countSpan = btnElement.querySelector(".like-counter");
+  const isLiked = btnElement.classList.contains("liked");
+
+  let count = parseInt(countSpan.innerText, 10) || 0;
+
+  if (isLiked) {
+    btnElement.classList.remove("liked");
+    icon.className = "bi bi-heart";
+    count = Math.max(0, count - 1);
+    countSpan.innerText = count > 0 ? count : "";
+
+    await supabaseClient
+      .from("diary_likes")
+      .delete()
+      .eq("entry_id", entryId)
+      .eq("user_id", currentUserId);
+  } else {
+    btnElement.classList.add("liked");
+    icon.className = "bi bi-heart-fill";
+    count = count + 1;
+    countSpan.innerText = count;
+
+    await supabaseClient
+      .from("diary_likes")
+      .insert({ entry_id: entryId, user_id: currentUserId });
+  }
+};
 
 function renderDiaryFilterBadges(users) {
   const container = document.getElementById("diaryAuthorFilters");
