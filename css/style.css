@@ -529,81 +529,102 @@ a.btn-trasa-gmaps * {
 }
 
 /* ==============================================================================
-   MODUŁ: PAMIĘTNIKI Z WAKACJI (PARADOKUMENT / POLSAT VIBE)
+   MODUŁ: PAMIĘTNIKI Z WAKACJI (ORYGINALNA BELKA POLSAT: LIMONKA + MAGENTA/FIOLET)
 ============================================================================== */
 .diary-card {
   background: #FFFFFF;
   border-radius: 12px;
-  border: 1px solid #D1D5DB;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border: 2px solid #6B0F59;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
   overflow: hidden;
   margin-bottom: 16px;
   position: relative;
 }
 
-/* Belka telewizyjna jak z "setki" w paradokumencie */
+/* GÓRNY PASEK (LIMONKOWO-ZIELONY GRADIENT) */
 .diary-header-badge {
-  background: linear-gradient(135deg, #1E1B18 0%, #2D1A22 60%, var(--burgund) 100%);
-  border-bottom: 3px solid #F59E0B; /* Polsatowski żółto-złoty pasek */
-  padding: 8px 12px;
-  color: #FFFFFF;
+  background: linear-gradient(180deg, #A8E817 0%, #83C905 50%, #68A700 100%);
+  border-bottom: 2px solid #4D7C00;
+  padding: 6px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
-/* Awatar z żółtą telewizyjną obwódką */
+/* Awatar z zieloną obwódką dopasowaną do belki */
 .diary-header-badge img.forum-avatar,
 .diary-header-badge .forum-avatar-placeholder {
-  border: 2px solid #F59E0B !important;
-  box-shadow: 0 0 6px rgba(245, 158, 11, 0.5);
+  border: 2px solid #2E5000 !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
 }
 
-/* Podpis bohatera (Wielkie litery, mocny kontrast) */
+/* IMIĘ I WIEK: Czarny, miękki, pochyły krój w stylu planszy */
 .diary-author-name {
-  color: #FFFFFF;
-  font-weight: 800;
-  font-size: 0.92rem;
-  letter-spacing: 0.8px;
-  text-transform: uppercase;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
-}
-
-/* Pasek opisu postaci z paradokumentu */
-.diary-author-tagline {
-  color: #FEF3C7; /* Ciepły, kremowo-żółty odcień */
-  font-size: 0.78rem;
-  font-style: normal;
-  font-weight: 500;
-  line-height: 1.2;
-  margin-top: 2px;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
-}
-
-/* Ramka na cytat / złotą myśl stylizowana na telewizyjne napisy dialogowe */
-.diary-quote-box {
-  background: #18181B; /* Ciemny kadr filmowy */
-  color: #FDE047; /* Żółte napisy dialogowe jak w telewizji */
-  border-left: 4px solid #F59E0B;
-  border-radius: 6px;
-  padding: 12px 14px;
-  font-size: 0.95rem;
-  font-weight: 600;
+  color: #000000 !important;
+  font-family: "Comic Sans MS", "Chalkboard SE", "Comic Neue", "Caveat", cursive, sans-serif;
+  font-weight: 700;
   font-style: italic;
-  line-height: 1.45;
-  box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.4);
+  font-size: 1.05rem;
+  line-height: 1.2;
+  letter-spacing: 0.2px;
+  text-shadow: none;
 }
 
-/* Zdjęcie w kadrze reality show */
+/* PODPIS / OPIS POSTACI POD IMIENIEM */
+.diary-author-tagline {
+  color: #1A3300 !important;
+  font-family: "Comic Sans MS", "Chalkboard SE", "Comic Neue", cursive, sans-serif;
+  font-size: 0.82rem;
+  font-style: italic;
+  font-weight: 600;
+  line-height: 1.2;
+  margin-top: 1px;
+}
+
+/* DATA I CZAS NA ZIELONEJ BELCE */
+.diary-header-badge span.text-muted,
+.diary-header-badge .text-muted {
+  color: #244200 !important;
+  font-weight: 700;
+  font-size: 11px;
+  text-shadow: none;
+}
+
+/* DOLNA RAMKA / ZŁOTA MYŚL / CYTAT: MAGENTA-FIOLET Z BIAŁYM POCHYŁYM TEKSTEM */
+.diary-quote-box {
+  background: linear-gradient(180deg, #D417B8 0%, #A80B91 50%, #7D036B 100%);
+  border: 1px solid #5C004F;
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-family: "Comic Sans MS", "Chalkboard SE", "Comic Neue", "Caveat", cursive, sans-serif;
+  font-size: 1.02rem;
+  font-weight: 700;
+  font-style: italic;
+  color: #FFFFFF !important;
+  line-height: 1.4;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
+  box-shadow: inset 0 1px 3px rgba(255, 255, 255, 0.3), 0 2px 5px rgba(0, 0, 0, 0.15);
+}
+
+/* FIOLETOWA RAMKA DLA KONTENERA ZE ZDJĘCIEM */
 .diary-photo-preview {
   width: 100%;
   max-height: 350px;
   object-fit: cover;
-  border-radius: 6px;
-  border: 1px solid #18181B;
+  border-radius: 8px;
+  border: 3px solid #A80B91;
+  box-shadow: 0 2px 6px rgba(168, 11, 145, 0.25);
 }
 
-/* Biała data i godzina w nagłówku belki */
-.diary-header-badge span.text-muted,
-.diary-header-badge .text-muted {
-  color: rgba(255, 255, 255, 0.85) !important;
-  font-weight: 500;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.6);
+/* PODPIS POD ZDJĘCIEM: WYŚRODKOWANY, FIOLETOWO-RÓŻOWY (MAGENTA), W TYM SAMYM KROJU */
+.diary-photo-caption {
+  text-align: center;
+  font-family: "Comic Sans MS", "Chalkboard SE", "Comic Neue", "Caveat", cursive, sans-serif;
+  font-size: 1.05rem;
+  font-weight: 700;
+  font-style: italic;
+  color: #A80B91;
+  margin-top: 8px;
+  line-height: 1.35;
+  text-shadow: 0.5px 0.5px 1px rgba(168, 11, 145, 0.2);
 }

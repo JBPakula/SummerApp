@@ -2993,7 +2993,7 @@ function renderSingleDiaryCard(entry, nowTime) {
     `;
   }
 
-  const isPhoto = (entry.content_type === 'photo' && entry.photo_url);
+const isPhoto = (entry.content_type === 'photo' && entry.photo_url);
 
   return `
     <div class="diary-card">
@@ -3014,7 +3014,7 @@ function renderSingleDiaryCard(entry, nowTime) {
       <div class="p-3">
         ${isPhoto ? `
           <img src="${entry.photo_url}" class="diary-photo-preview mb-2 shadow-sm" alt="Zdjęcie">
-          ${entry.text_content ? `<div class="small text-dark mt-1" style="font-size: 0.92rem;">${entry.text_content}</div>` : ''}
+          ${entry.text_content ? `<div class="diary-photo-caption">${entry.text_content}</div>` : ''}
         ` : `
           <div class="diary-quote-box">
             „${entry.text_content}”
