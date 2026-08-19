@@ -558,27 +558,42 @@ a.btn-trasa-gmaps * {
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
 }
 
-/* IMIĘ I WIEK: Czarny, miękki, pochyły krój w stylu planszy */
+/* IMIĘ I WIEK */
 .diary-author-name {
   color: #000000 !important;
-  font-family: "Comic Sans MS", "Chalkboard SE", "Comic Neue", "Caveat", cursive, sans-serif;
+  font-family: 'Comic Neue', cursive, sans-serif !important;
   font-weight: 700;
   font-style: italic;
   font-size: 1.05rem;
   line-height: 1.2;
   letter-spacing: 0.2px;
-  text-shadow: none;
 }
 
-/* PODPIS / OPIS POSTACI POD IMIENIEM */
+/* OPIS POSTACI POD IMIENIEM */
 .diary-author-tagline {
   color: #1A3300 !important;
-  font-family: "Comic Sans MS", "Chalkboard SE", "Comic Neue", cursive, sans-serif;
-  font-size: 0.82rem;
+  font-family: 'Comic Neue', cursive, sans-serif !important;
+  font-size: 0.85rem;
   font-style: italic;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.2;
   margin-top: 1px;
+}
+
+/* DOLNA RAMKA / ZŁOTA MYŚL / CYTAT */
+.diary-quote-box {
+  background: linear-gradient(180deg, #D417B8 0%, #A80B91 50%, #7D036B 100%);
+  border: 1px solid #5C004F;
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-family: 'Comic Neue', cursive, sans-serif !important;
+  font-size: 1.02rem;
+  font-weight: 700;
+  font-style: italic;
+  color: #FFFFFF !important;
+  line-height: 1.4;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
+  box-shadow: inset 0 1px 3px rgba(255, 255, 255, 0.3), 0 2px 5px rgba(0, 0, 0, 0.15);
 }
 
 /* DATA I CZAS NA ZIELONEJ BELCE */
@@ -590,21 +605,6 @@ a.btn-trasa-gmaps * {
   text-shadow: none;
 }
 
-/* DOLNA RAMKA / ZŁOTA MYŚL / CYTAT: MAGENTA-FIOLET Z BIAŁYM POCHYŁYM TEKSTEM */
-.diary-quote-box {
-  background: linear-gradient(180deg, #D417B8 0%, #A80B91 50%, #7D036B 100%);
-  border: 1px solid #5C004F;
-  border-radius: 6px;
-  padding: 10px 14px;
-  font-family: "Comic Sans MS", "Chalkboard SE", "Comic Neue", "Caveat", cursive, sans-serif;
-  font-size: 1.02rem;
-  font-weight: 700;
-  font-style: italic;
-  color: #FFFFFF !important;
-  line-height: 1.4;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
-  box-shadow: inset 0 1px 3px rgba(255, 255, 255, 0.3), 0 2px 5px rgba(0, 0, 0, 0.15);
-}
 
 
 /* ZDJĘCIE W ORYGINALNYCH PROPORCJACH (BEZ UCINANIA KADRU) */
