@@ -2230,7 +2230,7 @@ function renderCheatsheet(from, to, rate) {
 }
 
 // ==============================================================================
-// 6. MODUŁ: PORTFEL
+// 6. MODUŁ: PORTFEL (PRECYZYJNY PODZIAŁ, BRAK DŁUGU WOBEC SIEBIE, DYNAMICZNE UŁAMKI)
 // ==============================================================================
 function formatWalletSubPln(kwota, wal) {
   if (wal === "PLN") return "";
@@ -2267,19 +2267,23 @@ async function loadWallet() {
 
   if (aktywneKoszty.length > 0) {
     aktywneKoszty.forEach(w => {
-      const kwota = parseFloat(w.amount);
-      const wal = w.currency;
-      const ktoPlacil = w.paid_by;
+      const kwota = parseFloat(w.amount) || 0;
+      const wal = w.currency || "HUF";
+      const ktoPlacil = (w.paid_by || "").trim();
       const teamPlacacy = ekipyMapa[ktoPlacil] || ktoPlacil;
       const dlaKogoStr = (w.borrower || "Całe Stado").trim();
       const settledArray = Array.isArray(w.settled_by) ? w.settled_by : [];
       const kursDoHuf = bazaKursow[`${wal}_HUF`] || (wal === "HUF" ? 1.0 : (wal === "PLN" ? 85.2 : 368.0));
 
-      if (dlaKogoStr === "Całe Stado") {
+      // ------------------------------------------------------------------------
+      // WARIANT 1: CAŁE STADO (Zawsze 4 równe części po 1/4)
+      // ------------------------------------------------------------------------
+      if (dlaKogoStr === "Całe Stado" || dlaKogoStr.toLowerCase() === "wszyscy") {
         const kwotaUlamka = kwota / 4.0;
         const wartoscHuf = kwotaUlamka * kursDoHuf;
         const subPln = formatWalletSubPln(kwotaUlamka, wal);
 
+        // A. Płaciła inna ekipa -> My (nasz team) mamy im oddać 1/4
         if (teamPlacacy !== currentTeam) {
           const czyRozliczone = settledArray.includes(currentTeam);
           if (!czyRozliczone) razemHuf -= wartoscHuf;
@@ -2298,9 +2302,11 @@ async function loadWallet() {
               </button>
             </div>
           `);
-        } else {
+        } 
+        // B. My płaciliśmy -> Każda z POZOSTAŁYCH 3 ekip ma nam oddać po 1/4 (nigdy nie dodajemy długu dla własnej ekipy)
+        else {
           ALL_TEAMS.forEach(ekipa => {
-            if (ekipa === currentTeam) return;
+            if (ekipa === currentTeam) return; // Wykluczenie własnej ekipy!
             const czyRozliczone = settledArray.includes(ekipa);
             if (!czyRozliczone) razemHuf += wartoscHuf;
 
@@ -2320,22 +2326,30 @@ async function loadWallet() {
             `);
           });
         }
-      } else {
-        const targets = dlaKogoStr.split(",").map(s => s.trim());
-        const liczbaStron = targets.length + 1;
-        const kwotaUlamka = kwota / liczbaStron;
-        const fractionLabel = `1/${liczbaStron}`;
-        const wartoscHuf = kwotaUlamka * kursDoHuf;
-        const subPln = formatWalletSubPln(kwotaUlamka, wal);
+      } 
+      // ------------------------------------------------------------------------
+      // WARIANT 2: WYBRANE EKIPY LUB OSOBY
+      // ------------------------------------------------------------------------
+      else {
+        const rawList = dlaKogoStr.split(",").map(s => s.trim()).filter(Boolean);
+        const czyPodzialNaEkipy = rawList.some(item => ALL_TEAMS.includes(item));
 
-        targets.forEach(target => {
-          const teamTargetu = ekipyMapa[target] || target;
-          const czyToMyJestesmyDluznikiem = (target === currentUser || teamTargetu === currentTeam);
-          const czyToMyPlacilismy = (teamPlacacy === currentTeam || ktoPlacil === currentUser);
-          const relacjaId = target;
-          const czyRozliczone = settledArray.includes(relacjaId) || settledArray.includes(teamTargetu) || settledArray.includes(target);
+        if (czyPodzialNaEkipy) {
+          // PODZIAŁ NA EKIPY: Zbiór unikalnych ekip (zawsze wliczamy ekipę płacącą dokładnie 1 raz)
+          const participatingTeams = new Set(rawList.filter(item => ALL_TEAMS.includes(item)));
+          participatingTeams.add(teamPlacacy);
 
-          if (czyToMyJestesmyDluznikiem && !czyToMyPlacilismy) {
+          const totalTeamsCount = participatingTeams.size;
+          if (totalTeamsCount === 0) return;
+
+          const kwotaUlamka = kwota / totalTeamsCount;
+          const fractionLabel = `1/${totalTeamsCount}`;
+          const wartoscHuf = kwotaUlamka * kursDoHuf;
+          const subPln = formatWalletSubPln(kwotaUlamka, wal);
+
+          // A. Płaciła inna ekipa, a nasza ekipa jest w podziale -> Mamy im oddać naszą część
+          if (teamPlacacy !== currentTeam && participatingTeams.has(currentTeam)) {
+            const czyRozliczone = settledArray.includes(currentTeam);
             if (!czyRozliczone) razemHuf -= wartoscHuf;
 
             mamyOddac.push(`
@@ -2347,30 +2361,93 @@ async function loadWallet() {
                     ${subPln}
                   </div>
                 </div>
-                <button class="btn btn-sm ${czyRozliczone ? 'btn-settled-yes' : 'btn-settled-no'}" onclick="window.oznaczRozliczenie(${w.id}, '${relacjaId}', ${!czyRozliczone})">
-                  ${czyRozliczone ? '✓ Rozliczono' : '✕ Do rozliczenia'}
-                </button>
-              </div>
-            `);
-          } else if (czyToMyPlacilismy && !czyToMyJestesmyDluznikiem) {
-            if (!czyRozliczone) razemHuf += wartoscHuf;
-
-            ktosZalega.push(`
-              <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
-                <div>
-                  <span class="wallet-badge-fraction">${fractionLabel}</span> <b>${target}</b> za <i>${w.cost_name}</i>:
-                  <div class="mt-1">
-                    <b class="${czyRozliczone ? 'text-decoration-line-through text-muted' : 'text-success'}">${kwotaUlamka.toFixed(2)} ${wal}</b>
-                    ${subPln}
-                  </div>
-                </div>
-                <button class="btn btn-sm ${czyRozliczone ? 'btn-settled-yes' : 'btn-settled-no'}" onclick="window.oznaczRozliczenie(${w.id}, '${relacjaId}', ${!czyRozliczone})">
+                <button class="btn btn-sm ${czyRozliczone ? 'btn-settled-yes' : 'btn-settled-no'}" onclick="window.oznaczRozliczenie(${w.id}, '${currentTeam}', ${!czyRozliczone})">
                   ${czyRozliczone ? '✓ Rozliczono' : '✕ Do rozliczenia'}
                 </button>
               </div>
             `);
           }
-        });
+          // B. My płaciliśmy -> Wyświetlamy tylko INNE uczestniczące ekipy
+          else if (teamPlacacy === currentTeam) {
+            participatingTeams.forEach(ekipa => {
+              if (ekipa === currentTeam) return; // Wykluczenie siebie!
+              const czyRozliczone = settledArray.includes(ekipa);
+              if (!czyRozliczone) razemHuf += wartoscHuf;
+
+              ktosZalega.push(`
+                <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                  <div>
+                    <span class="wallet-badge-fraction">${fractionLabel}</span> <b>${ekipa}</b> za <i>${w.cost_name}</i>:
+                    <div class="mt-1">
+                      <b class="${czyRozliczone ? 'text-decoration-line-through text-muted' : 'text-success'}">${kwotaUlamka.toFixed(2)} ${wal}</b>
+                      ${subPln}
+                    </div>
+                  </div>
+                  <button class="btn btn-sm ${czyRozliczone ? 'btn-settled-yes' : 'btn-settled-no'}" onclick="window.oznaczRozliczenie(${w.id}, '${ekipa}', ${!czyRozliczone})">
+                    ${czyRozliczone ? '✓ Rozliczono' : '✕ Do rozliczenia'}
+                  </button>
+                </div>
+              `);
+            });
+          }
+        } 
+        else {
+          // PODZIAŁ NA KONKRETNE OSOBY: Zbiór unikalnych osób (zawsze wliczamy osobę płacącą dokładnie 1 raz)
+          const participatingPersons = new Set(rawList);
+          participatingPersons.add(ktoPlacil);
+
+          const totalPersonsCount = participatingPersons.size;
+          if (totalPersonsCount === 0) return;
+
+          const kwotaUlamka = kwota / totalPersonsCount;
+          const fractionLabel = `1/${totalPersonsCount}`;
+          const wartoscHuf = kwotaUlamka * kursDoHuf;
+          const subPln = formatWalletSubPln(kwotaUlamka, wal);
+
+          // A. Płacił ktoś inny, a my (jako osoba) jesteśmy w podziale
+          if (ktoPlacil !== currentUser && participatingPersons.has(currentUser)) {
+            const czyRozliczone = settledArray.includes(currentUser) || settledArray.includes(currentTeam);
+            if (!czyRozliczone) razemHuf -= wartoscHuf;
+
+            mamyOddac.push(`
+              <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                <div>
+                  <span class="wallet-badge-fraction">${fractionLabel}</span> Dla: <b>${ktoPlacil} (${teamPlacacy})</b> za <i>${w.cost_name}</i>:
+                  <div class="mt-1">
+                    <b class="${czyRozliczone ? 'text-decoration-line-through text-muted' : 'text-danger'}">${kwotaUlamka.toFixed(2)} ${wal}</b>
+                    ${subPln}
+                  </div>
+                </div>
+                <button class="btn btn-sm ${czyRozliczone ? 'btn-settled-yes' : 'btn-settled-no'}" onclick="window.oznaczRozliczenie(${w.id}, '${currentUser}', ${!czyRozliczone})">
+                  ${czyRozliczone ? '✓ Rozliczono' : '✕ Do rozliczenia'}
+                </button>
+              </div>
+            `);
+          }
+          // B. My płaciliśmy -> Wyświetlamy pozostałe osoby biorące udział
+          else if (ktoPlacil === currentUser) {
+            participatingPersons.forEach(osoba => {
+              if (osoba === currentUser) return; // Wykluczenie siebie!
+              const czyRozliczone = settledArray.includes(osoba);
+              if (!czyRozliczone) razemHuf += wartoscHuf;
+
+              ktosZalega.push(`
+                <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                  <div>
+                    <span class="wallet-badge-fraction">${fractionLabel}</span> <b>${osoba}</b> za <i>${w.cost_name}</i>:
+                    <div class="mt-1">
+                      <b class="${czyRozliczone ? 'text-decoration-line-through text-muted' : 'text-success'}">${kwotaUlamka.toFixed(2)} ${wal}</b>
+                      ${subPln}
+                    </div>
+                  </div>
+                  <button class="btn btn-sm ${czyRozliczone ? 'btn-settled-yes' : 'btn-settled-no'}" onclick="window.oznaczRozliczenie(${w.id}, '${osoba}', ${!czyRozliczone})">
+                    ${czyRozliczone ? '✓ Rozliczono' : '✕ Do rozliczenia'}
+                  </button>
+                </div>
+              `);
+            });
+          }
+        }
       }
     });
   }
