@@ -2230,7 +2230,7 @@ function renderCheatsheet(from, to, rate) {
 }
 
 // ==============================================================================
-// 6. MODUŁ: PORTFEL (PRECYZYJNY PODZIAŁ, BRAK DŁUGU WOBEC SIEBIE, DYNAMICZNE UŁAMKI)
+// 6. MODUŁ: PORTFEL (KOMPENSATA WZAJEMNYCH NALEŻNOŚCI + SZCZEGÓŁY TRANSAKCJI)
 // ==============================================================================
 function formatWalletSubPln(kwota, wal) {
   if (wal === "PLN") return "";
@@ -2249,12 +2249,14 @@ async function loadWallet() {
     .eq("deleted", false)
     .eq("is_private", false);
 
+  const teamBalancesContainer = document.getElementById("walletTeamBalances");
   const oweContainer = document.getElementById("walletOweList");
   const dueContainer = document.getElementById("walletDueList");
   const summaryEl = document.getElementById("walletTotalSummary");
 
   if (!oweContainer || !dueContainer || !summaryEl) return;
 
+  if (teamBalancesContainer) teamBalancesContainer.innerHTML = "";
   oweContainer.innerHTML = "";
   dueContainer.innerHTML = "";
 
@@ -2262,6 +2264,14 @@ async function loadWallet() {
   const mamyOddac = [];
   const ktosZalega = [];
   const ALL_TEAMS = ["Bobry", "Pakuły", "Robaki", "Sileziny"];
+
+  // Struktura do kompensaty per ekipa: { "Sileziny": { oweHuf: 0, dueHuf: 0, count: 0 } }
+  const teamBalances = {};
+  ALL_TEAMS.forEach(team => {
+    if (team !== currentTeam) {
+      teamBalances[team] = { oweHuf: 0, dueHuf: 0, count: 0 };
+    }
+  });
 
   const aktywneKoszty = listaW ? listaW.filter(w => w.is_archived !== true) : [];
 
@@ -2276,17 +2286,23 @@ async function loadWallet() {
       const kursDoHuf = bazaKursow[`${wal}_HUF`] || (wal === "HUF" ? 1.0 : (wal === "PLN" ? 85.2 : 368.0));
 
       // ------------------------------------------------------------------------
-      // WARIANT 1: CAŁE STADO (Zawsze 4 równe części po 1/4)
+      // WARIANT 1: CAŁE STADO (4 równe części po 1/4)
       // ------------------------------------------------------------------------
       if (dlaKogoStr === "Całe Stado" || dlaKogoStr.toLowerCase() === "wszyscy") {
         const kwotaUlamka = kwota / 4.0;
         const wartoscHuf = kwotaUlamka * kursDoHuf;
         const subPln = formatWalletSubPln(kwotaUlamka, wal);
 
-        // A. Płaciła inna ekipa -> My (nasz team) mamy im oddać 1/4
+        // A. Płaciła inna ekipa -> My mamy im oddać 1/4
         if (teamPlacacy !== currentTeam) {
           const czyRozliczone = settledArray.includes(currentTeam);
-          if (!czyRozliczone) razemHuf -= wartoscHuf;
+          if (!czyRozliczone) {
+            razemHuf -= wartoscHuf;
+            if (teamBalances[teamPlacacy]) {
+              teamBalances[teamPlacacy].oweHuf += wartoscHuf;
+              teamBalances[teamPlacacy].count += 1;
+            }
+          }
 
           mamyOddac.push(`
             <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
@@ -2303,12 +2319,18 @@ async function loadWallet() {
             </div>
           `);
         } 
-        // B. My płaciliśmy -> Każda z POZOSTAŁYCH 3 ekip ma nam oddać po 1/4 (nigdy nie dodajemy długu dla własnej ekipy)
+        // B. My płaciliśmy -> Każda z pozostałych ekip ma nam oddać po 1/4
         else {
           ALL_TEAMS.forEach(ekipa => {
-            if (ekipa === currentTeam) return; // Wykluczenie własnej ekipy!
+            if (ekipa === currentTeam) return;
             const czyRozliczone = settledArray.includes(ekipa);
-            if (!czyRozliczone) razemHuf += wartoscHuf;
+            if (!czyRozliczone) {
+              razemHuf += wartoscHuf;
+              if (teamBalances[ekipa]) {
+                teamBalances[ekipa].dueHuf += wartoscHuf;
+                teamBalances[ekipa].count += 1;
+              }
+            }
 
             ktosZalega.push(`
               <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
@@ -2335,7 +2357,6 @@ async function loadWallet() {
         const czyPodzialNaEkipy = rawList.some(item => ALL_TEAMS.includes(item));
 
         if (czyPodzialNaEkipy) {
-          // PODZIAŁ NA EKIPY: Zbiór unikalnych ekip (zawsze wliczamy ekipę płacącą dokładnie 1 raz)
           const participatingTeams = new Set(rawList.filter(item => ALL_TEAMS.includes(item)));
           participatingTeams.add(teamPlacacy);
 
@@ -2347,10 +2368,16 @@ async function loadWallet() {
           const wartoscHuf = kwotaUlamka * kursDoHuf;
           const subPln = formatWalletSubPln(kwotaUlamka, wal);
 
-          // A. Płaciła inna ekipa, a nasza ekipa jest w podziale -> Mamy im oddać naszą część
+          // A. Płaciła inna ekipa
           if (teamPlacacy !== currentTeam && participatingTeams.has(currentTeam)) {
             const czyRozliczone = settledArray.includes(currentTeam);
-            if (!czyRozliczone) razemHuf -= wartoscHuf;
+            if (!czyRozliczone) {
+              razemHuf -= wartoscHuf;
+              if (teamBalances[teamPlacacy]) {
+                teamBalances[teamPlacacy].oweHuf += wartoscHuf;
+                teamBalances[teamPlacacy].count += 1;
+              }
+            }
 
             mamyOddac.push(`
               <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
@@ -2367,12 +2394,18 @@ async function loadWallet() {
               </div>
             `);
           }
-          // B. My płaciliśmy -> Wyświetlamy tylko INNE uczestniczące ekipy
+          // B. My płaciliśmy
           else if (teamPlacacy === currentTeam) {
             participatingTeams.forEach(ekipa => {
-              if (ekipa === currentTeam) return; // Wykluczenie siebie!
+              if (ekipa === currentTeam) return;
               const czyRozliczone = settledArray.includes(ekipa);
-              if (!czyRozliczone) razemHuf += wartoscHuf;
+              if (!czyRozliczone) {
+                razemHuf += wartoscHuf;
+                if (teamBalances[ekipa]) {
+                  teamBalances[ekipa].dueHuf += wartoscHuf;
+                  teamBalances[ekipa].count += 1;
+                }
+              }
 
               ktosZalega.push(`
                 <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
@@ -2392,7 +2425,7 @@ async function loadWallet() {
           }
         } 
         else {
-          // PODZIAŁ NA KONKRETNE OSOBY: Zbiór unikalnych osób (zawsze wliczamy osobę płacącą dokładnie 1 raz)
+          // PODZIAŁ NA OSOBY
           const participatingPersons = new Set(rawList);
           participatingPersons.add(ktoPlacil);
 
@@ -2404,10 +2437,16 @@ async function loadWallet() {
           const wartoscHuf = kwotaUlamka * kursDoHuf;
           const subPln = formatWalletSubPln(kwotaUlamka, wal);
 
-          // A. Płacił ktoś inny, a my (jako osoba) jesteśmy w podziale
+          // A. Płacił ktoś inny
           if (ktoPlacil !== currentUser && participatingPersons.has(currentUser)) {
             const czyRozliczone = settledArray.includes(currentUser) || settledArray.includes(currentTeam);
-            if (!czyRozliczone) razemHuf -= wartoscHuf;
+            if (!czyRozliczone) {
+              razemHuf -= wartoscHuf;
+              if (teamBalances[teamPlacacy]) {
+                teamBalances[teamPlacacy].oweHuf += wartoscHuf;
+                teamBalances[teamPlacacy].count += 1;
+              }
+            }
 
             mamyOddac.push(`
               <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
@@ -2424,17 +2463,24 @@ async function loadWallet() {
               </div>
             `);
           }
-          // B. My płaciliśmy -> Wyświetlamy pozostałe osoby biorące udział
+          // B. My płaciliśmy
           else if (ktoPlacil === currentUser) {
             participatingPersons.forEach(osoba => {
-              if (osoba === currentUser) return; // Wykluczenie siebie!
+              if (osoba === currentUser) return;
+              const ekipaOsoby = ekipyMapa[osoba] || osoba;
               const czyRozliczone = settledArray.includes(osoba);
-              if (!czyRozliczone) razemHuf += wartoscHuf;
+              if (!czyRozliczone) {
+                razemHuf += wartoscHuf;
+                if (teamBalances[ekipaOsoby]) {
+                  teamBalances[ekipaOsoby].dueHuf += wartoscHuf;
+                  teamBalances[ekipaOsoby].count += 1;
+                }
+              }
 
               ktosZalega.push(`
                 <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
                   <div>
-                    <span class="wallet-badge-fraction">${fractionLabel}</span> <b>${osoba}</b> za <i>${w.cost_name}</i>:
+                    <span class="wallet-badge-fraction">${fractionLabel}</span> <b>${osoba}</b> (${ekipaOsoby}) za <i>${w.cost_name}</i>:
                     <div class="mt-1">
                       <b class="${czyRozliczone ? 'text-decoration-line-through text-muted' : 'text-success'}">${kwotaUlamka.toFixed(2)} ${wal}</b>
                       ${subPln}
@@ -2450,6 +2496,65 @@ async function loadWallet() {
         }
       }
     });
+  }
+
+  // ----------------------------------------------------------------------------
+  // RENDEROWANIE BILANSÓW KOMPENSACYJNYCH PER EKIPA
+  // ----------------------------------------------------------------------------
+  if (teamBalancesContainer) {
+    const balanceCards = Object.entries(teamBalances).map(([teamName, data]) => {
+      const netHuf = Math.round(data.dueHuf - data.oweHuf);
+      const rateHufPln = bazaKursow["HUF_PLN"] || 0.0117;
+      const netPln = (Math.abs(netHuf) * rateHufPln).toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      
+      const countLabel = data.count === 1 ? "1 wspólnego wydatku" : `${data.count} wspólnych wydatków`;
+
+      if (netHuf > 0) {
+        // Ekipa ma nam oddać
+        return `
+          <div class="p-2 mb-2 rounded-3 border bg-white shadow-sm d-flex justify-content-between align-items-center border-start border-4 border-success">
+            <div>
+              <div class="fw-bold fs-6 text-dark">${teamName}</div>
+              <div class="text-muted" style="font-size: 11px;">z ${countLabel}</div>
+            </div>
+            <div class="text-end">
+              <div class="fw-bold text-success fs-6">+${netHuf.toLocaleString('pl-PL')} HUF</div>
+              <div class="text-muted" style="font-size: 11px;">(~${netPln} PLN do odebrania)</div>
+            </div>
+          </div>
+        `;
+      } else if (netHuf < 0) {
+        // My mamy oddać ekipie
+        const absHuf = Math.abs(netHuf);
+        return `
+          <div class="p-2 mb-2 rounded-3 border bg-white shadow-sm d-flex justify-content-between align-items-center border-start border-4 border-danger">
+            <div>
+              <div class="fw-bold fs-6 text-dark">${teamName}</div>
+              <div class="text-muted" style="font-size: 11px;">z ${countLabel}</div>
+            </div>
+            <div class="text-end">
+              <div class="fw-bold text-danger fs-6">-${absHuf.toLocaleString('pl-PL')} HUF</div>
+              <div class="text-muted" style="font-size: 11px;">(~${netPln} PLN do oddania)</div>
+            </div>
+          </div>
+        `;
+      } else {
+        // Czysto
+        return `
+          <div class="p-2 mb-2 rounded-3 border bg-light d-flex justify-content-between align-items-center opacity-75">
+            <div>
+              <div class="fw-bold small text-dark">${teamName}</div>
+              <div class="text-muted" style="font-size: 10.5px;">Wszystko rozliczone</div>
+            </div>
+            <div class="text-end fw-bold text-muted small">
+              0 HUF
+            </div>
+          </div>
+        `;
+      }
+    });
+
+    teamBalancesContainer.innerHTML = balanceCards.join("");
   }
 
   oweContainer.innerHTML = mamyOddac.length ? mamyOddac.join("") : "<div class='text-muted small'>Czysto! Brak zaległości.</div>";

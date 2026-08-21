@@ -621,7 +621,7 @@
         </div>
       </section>
 
-      <!-- ========================================================================== -->
+<!-- ========================================================================== -->
       <!-- 6. MODUŁ: PORTFEL -->
       <!-- ========================================================================== -->
       <section id="tab-wallet" class="app-tab" style="display: none;">
@@ -632,16 +632,23 @@
 
         <div class="card p-3 border-0 shadow-sm rounded-4 mb-3">
           <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
-            <span class="fw-bold">Twój Bilans:</span>
+            <span class="fw-bold">Twój Bilans Całkowity:</span>
             <span id="walletTotalSummary" class="fs-5 fw-bold">0 HUF</span>
           </div>
 
-          <h6 class="text-danger fw-bold mb-2">🔴 Do oddania innym:</h6>
+          <!-- NOWA SEKCJA: WZAJEMNE BILANSE Z POSZCZEGÓLNYMI EKIPAMI -->
+          <h6 class="fw-bold mb-2" style="color: var(--burgund);">🤝 Bilans z poszczególnymi ekipami:</h6>
+          <div id="walletTeamBalances" class="mb-3"></div>
+
+          <hr class="my-3">
+
+          <!-- SZCZEGÓŁOWE TRANSAKCJE -->
+          <h6 class="text-danger fw-bold mb-2">🔴 Szczegóły: Do oddania innym:</h6>
           <div id="walletOweList" class="small mb-3"></div>
 
-          <hr>
+          <hr class="my-3">
 
-          <h6 class="text-success fw-bold mb-2">🟢 Do odebrania od innych:</h6>
+          <h6 class="text-success fw-bold mb-2">🟢 Szczegóły: Do odebrania od innych:</h6>
           <div id="walletDueList" class="small mb-2"></div>
         </div>
       </section>
